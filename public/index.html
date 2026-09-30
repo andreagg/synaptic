@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14151a">
+  <title>Synaptic Library</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="#/" class="brand">📚 <span>Synaptic</span> Library</a>
+    <button id="addBtn" class="btn primary">+ Aggiungi</button>
+  </header>
+  <main id="view"></main>
+
+  <dialog id="addDialog">
+    <form method="dialog" id="addForm">
+      <h2>Aggiungi una fonte</h2>
+      <p class="muted">Incolla l'indirizzo di un sito: elenco capitoli, fumetto, PDF, raccolta di documenti o articolo.</p>
+      <label>URL<input name="url" type="url" required placeholder="https://…/lista-capitoli"></label>
+      <label>Titolo (facoltativo)<input name="title" placeholder="Rilevato automaticamente"></label>
+      <label>Controlla aggiornamenti
+        <select name="update_hours">
+          <option value="0">Mai</option><option value="1">Ogni ora</option><option value="6">Ogni 6 ore</option>
+          <option value="24" selected>Ogni giorno</option><option value="168">Ogni settimana</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="use_ai" checked> Usa l'AI per i casi complicati</label>
+      <label class="check"><input type="checkbox" name="render_js"> Il sito carica i contenuti con JavaScript</label>
+      <div class="row end">
+        <button value="cancel" formnovalidate class="btn">Annulla</button>
+        <button value="ok" class="btn primary">Aggiungi</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

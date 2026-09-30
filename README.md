@@ -1,201 +1,83 @@
-Synaptic [![Build Status](https://travis-ci.org/cazala/synaptic.svg?branch=master)](https://travis-ci.org/cazala/synaptic) [![Join the chat at https://synapticjs.slack.com](https://synaptic-slack-ugiqacqvmd.now.sh/badge.svg)](https://synaptic-slack-ugiqacqvmd.now.sh/)
-========
+# 📚 Synaptic Library
 
-## Important: [Synaptic 2.x](https://github.com/cazala/synaptic/issues/140) is in stage of discussion now! Feel free to participate
+Trasforma **qualsiasi sito** (manga, fumetti, capitoli, PDF, raccolte di documenti, articoli) in una
+**libreria digitale** da leggere in un'unica web app, anche da smartphone, con **controllo automatico
+degli aggiornamenti** e **AI (Claude) per i casi complicati**.
 
-Synaptic is a javascript neural network library for **node.js** and the **browser**, its generalized algorithm is architecture-free, so you can build and train basically any type of first order or even [second order neural network](http://en.wikipedia.org/wiki/Recurrent_neural_network#Second_Order_Recurrent_Neural_Network) architectures.
+## Avvio rapido
 
-This library includes a few built-in architectures like [multilayer perceptrons](http://en.wikipedia.org/wiki/Multilayer_perceptron), [multilayer long-short term memory](http://en.wikipedia.org/wiki/Long_short_term_memory) networks (LSTM), [liquid state machines](http://en.wikipedia.org/wiki/Liquid_state_machine) or [Hopfield](http://en.wikipedia.org/wiki/Hopfield_network) networks, and a trainer capable of training any given network, which includes built-in training tasks/tests like solving an XOR, completing a Distracted Sequence Recall task or an [Embedded Reber Grammar](http://www.willamette.edu/~gorr/classes/cs449/reber.html) test, so you can easily test and compare the performance of different architectures.
-
-
-The algorithm implemented by this library has been taken from Derek D. Monner's paper:
-
-[A generalized LSTM-like training algorithm for second-order recurrent neural networks](http://www.overcomplete.net/papers/nn2012.pdf)
-
-
-There are references to the equations in that paper commented through the source code.
-
-####Introduction
-
-If you have no prior knowledge about Neural Networks, you should start by [reading this guide](https://github.com/cazala/synaptic/wiki/Neural-Networks-101).
-
-
-If you want a practical example on how to feed data to a neural network, then take a look at [this article](https://github.com/cazala/synaptic/wiki/Normalization-101).
-
-You may also want to take a look at [this article](http://blog.webkid.io/neural-networks-in-javascript/).
-
-####Demos
-
-- [Solve an XOR](http://caza.la/synaptic/#/xor)
-- [Discrete Sequence Recall Task](http://caza.la/synaptic/#/dsr)
-- [Learn Image Filters](http://caza.la/synaptic/#/image-filters)
-- [Paint an Image](http://caza.la/synaptic/#/paint-an-image)
-- [Self Organizing Map](http://caza.la/synaptic/#/self-organizing-map)
-- [Read from Wikipedia](http://caza.la/synaptic/#/wikipedia)
-
-The source code of these demos can be found in [this branch](https://github.com/cazala/synaptic/tree/gh-pages/scripts).
-
-####Getting started
-
-- [Neurons](https://github.com/cazala/synaptic/wiki/Neurons/)
-- [Layers](https://github.com/cazala/synaptic/wiki/Layers/)
-- [Networks](https://github.com/cazala/synaptic/wiki/Networks/)
-- [Trainer](https://github.com/cazala/synaptic/wiki/Trainer/)
-- [Architect](https://github.com/cazala/synaptic/wiki/Architect/)
-
-To try out the examples, checkout the [gh-pages](https://github.com/cazala/synaptic/tree/gh-pages) branch.
-
-`git checkout gh-pages`
-
-
-##Overview
-
-###Installation
-
-#####In node
-
-You can install synaptic with [npm](http://npmjs.org):
-
-```cmd
-npm install synaptic --save
+```bash
+npm install
+npm start                 # http://localhost:3000
 ```
 
-#####In the browser
+Poi premi **+ Aggiungi** e incolla l'URL, per esempio
+`https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli`.
 
-You can install synaptic with [bower](http://bower.io):
+Per provarla senza internet c'è un sito demo con la stessa struttura (volumi → capitoli, lettore una pagina per URL, popup pubblicitari):
 
-```cmd
-bower install synaptic
+```bash
+npm run mock              # sito demo su http://127.0.0.1:4000/manga8/onepiece/volumi/lista-capitoli
+npm test                  # test del motore contro il sito demo
 ```
 
-Or you can simply use the CDN link, kindly provided by [CDNjs](https://cdnjs.com/)
+### Variabili d'ambiente
 
-```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/synaptic/1.0.8/synaptic.js"></script>
+| Variabile | Default | Descrizione |
+|---|---|---|
+| `PORT` | `3000` | Porta del server |
+| `DATA_DIR` | `./data` | Database SQLite e cache dei media (lettura offline) |
+| `ANTHROPIC_API_KEY` | – | Abilita il fallback AI per i siti difficili |
+| `AI_MODEL` | `claude-opus-5-5` | Modello usato per l'analisi |
+| `REQUEST_DELAY_MS` / `PER_HOST_CONCURRENCY` | `150` / `3` | Ritmo delle richieste verso i siti |
+| `CHROMIUM_PATH` | – | Chromium per i siti che generano contenuti in JavaScript (serve `npm i playwright`) |
+
+## Come funziona il motore
+
+```
+URL ─► fetcher ─► analizzatore euristico ─┬─► indice capitoli (anche paginato)  ─► capitoli
+                  (src/engine/analyze.js) ├─► file PDF/CBZ/EPUB                  ─► documenti
+                                          ├─► immagini in pagina (lazy-load, JS) ─► fumetto
+                                          ├─► testo principale                   ─► articolo
+                                          └─► confidenza bassa ─► AI (Claude) ──► dati + regole
 ```
 
-###Usage
+1. **Scansione della fonte** – raggruppa i link per "firma" dell'URL (stesso percorso, numeri
+   generalizzati) e sceglie il gruppo che sembra un elenco di capitoli (numerazione, parole come
+   *capitolo/chapter/volume*, esclusione di menu/header/footer). Segue la paginazione dell'indice.
+   I capitoli sono ordinati per numero (`Capitolo 009 - Femme fatale` → 9).
+2. **Risoluzione di un capitolo** (su richiesta, alla prima lettura, o con *Scarica offline*):
+   - tutte le immagini nella pagina → fumetto (gestisce `data-src`, `srcset`, `<noscript>`, array nello script);
+   - una immagine per pagina (menu *Pagina 01*, frecce, `?pagina=N`) → visita le pagine dello stesso
+     capitolo scartando pubblicità e link ai capitoli successivi;
+   - PDF/CBZ/EPUB → documento; pagina di volume che elenca capitoli → viene espansa;
+   - testo lungo → articolo pulito.
+3. **AI** – se le euristiche non bastano, un riassunto compatto della pagina (link, immagini, testo) viene
+   inviato a Claude con output strutturato. L'AI restituisce i dati **e delle regole regex** salvate sul
+   libro: i controlli successivi le riutilizzano senza nuove chiamate.
+4. **Aggiornamenti** – lo scheduler controlla ogni libro con la frequenza scelta (ora/6h/giorno/settimana)
+   e segna i nuovi capitoli con un badge.
+5. **Media proxy con cache** – immagini e PDF passano da `/api/media` (con il `Referer` corretto contro
+   i blocchi hotlink) e restano in cache su disco per la lettura offline.
 
-```javascript
-var synaptic = require('synaptic'); // this line is not needed in the browser
-var Neuron = synaptic.Neuron,
-	Layer = synaptic.Layer,
-	Network = synaptic.Network,
-	Trainer = synaptic.Trainer,
-	Architect = synaptic.Architect;
+## Struttura
+
+```
+server.js               API REST + file statici
+src/db.js               SQLite (node:sqlite): libri e capitoli
+src/fetcher.js          HTTP con retry, limiti per host, proxy, cache media, rendering JS opzionale
+src/engine/analyze.js   euristiche generiche di riconoscimento
+src/engine/ai.js        fallback Claude con output strutturato
+src/engine/engine.js    orchestrazione: scansione, risoluzione capitoli, download offline
+src/scheduler.js        controllo periodico aggiornamenti
+public/                 web app mobile-first (libreria, scheda libro, lettore)
+test/                   sito demo + test del motore
 ```
 
-Now you can start to create networks, train them, or use built-in networks from the [Architect](http://github.com/cazala/synaptic#architect).
+## API
 
-###Examples
+`GET /api/books` · `POST /api/books {url, title?, update_hours?, use_ai?, render_js?}` ·
+`GET|PATCH|DELETE /api/books/:id` · `POST /api/books/:id/scan` · `POST /api/books/:id/download` ·
+`GET /api/chapters/:id` (risolve il contenuto) · `POST /api/chapters/:id/progress` · `GET /api/media?u=&ref=`
 
-#####Perceptron
-
-This is how you can create a simple **perceptron**:
-
-![perceptron](http://www.codeproject.com/KB/dotnet/predictor/network.jpg).
-
-```javascript
-function Perceptron(input, hidden, output)
-{
-	// create the layers
-	var inputLayer = new Layer(input);
-	var hiddenLayer = new Layer(hidden);
-	var outputLayer = new Layer(output);
-
-	// connect the layers
-	inputLayer.project(hiddenLayer);
-	hiddenLayer.project(outputLayer);
-
-	// set the layers
-	this.set({
-		input: inputLayer,
-		hidden: [hiddenLayer],
-		output: outputLayer
-	});
-}
-
-// extend the prototype chain
-Perceptron.prototype = new Network();
-Perceptron.prototype.constructor = Perceptron;
-```
-
-Now you can test your new network by creating a trainer and teaching the perceptron to learn an XOR
-
-```javascript
-var myPerceptron = new Perceptron(2,3,1);
-var myTrainer = new Trainer(myPerceptron);
-
-myTrainer.XOR(); // { error: 0.004998819355993572, iterations: 21871, time: 356 }
-
-myPerceptron.activate([0,0]); // 0.0268581547421616
-myPerceptron.activate([1,0]); // 0.9829673642853368
-myPerceptron.activate([0,1]); // 0.9831714267395621
-myPerceptron.activate([1,1]); // 0.02128894618097928
-```
-
-#####Long Short-Term Memory
-
-This is how you can create a simple **long short-term memory** network with input gate, forget gate, output gate, and peephole connections:
-
-![long short-term memory](http://people.idsia.ch/~juergen/lstmcell4.jpg)
-
-```javascript
-function LSTM(input, blocks, output)
-{
-	// create the layers
-	var inputLayer = new Layer(input);
-	var inputGate = new Layer(blocks);
-	var forgetGate = new Layer(blocks);
-	var memoryCell = new Layer(blocks);
-	var outputGate = new Layer(blocks);
-	var outputLayer = new Layer(output);
-
-	// connections from input layer
-	var input = inputLayer.project(memoryCell);
-	inputLayer.project(inputGate);
-	inputLayer.project(forgetGate);
-	inputLayer.project(outputGate);
-
-	// connections from memory cell
-	var output = memoryCell.project(outputLayer);
-
-	// self-connection
-	var self = memoryCell.project(memoryCell);
-
-	// peepholes
-	memoryCell.project(inputGate);
-	memoryCell.project(forgetGate);
-	memoryCell.project(outputGate);
-
-	// gates
-	inputGate.gate(input, Layer.gateType.INPUT);
-	forgetGate.gate(self, Layer.gateType.ONE_TO_ONE);
-	outputGate.gate(output, Layer.gateType.OUTPUT);
-
-	// input to output direct connection
-	inputLayer.project(outputLayer);
-
-	// set the layers of the neural network
-	this.set({
-		input: inputLayer,
-		hidden: [inputGate, forgetGate, memoryCell, outputGate],
-		output: outputLayer
-	});
-}
-
-// extend the prototype chain
-LSTM.prototype = new Network();
-LSTM.prototype.constructor = LSTM;
-```
-
-These are examples for explanatory purposes, the [Architect](https://github.com/cazala/synaptic/wiki/Architect/) already includes Multilayer Perceptrons and
-Multilayer LSTM network architectures.
-
-##Contribute
-
-**Synaptic** is an Open Source project that started in Buenos Aires, Argentina. Anybody in the world is welcome to contribute to the development of the project.
-
-If you want to contribute feel free to send PR's, just make sure to run **npm run test** and **npm run build** before submiting it. This way you'll run all the test specs and build the web distribution files.
-
-<3
+> Usa l'app solo per contenuti che hai il diritto di scaricare e leggere, rispettando i termini dei siti.

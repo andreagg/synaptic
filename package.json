@@ -1,58 +1,24 @@
 {
-  "name": "synaptic",
-  "version": "1.0.9",
-  "description": "architecture-free neural network library",
-  "main": "./src/synaptic",
+  "name": "synaptic-library",
+  "version": "1.0.0",
+  "description": "Trasforma qualsiasi sito (manga, fumetti, PDF, articoli) in una libreria digitale leggibile, con aggiornamenti automatici e AI per i casi difficili.",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "test": "npm run test:src",
-    "test:src": "mocha test --require src/synaptic.js ./test",
-    "test:dist": "npm run build && npm run test:mocha:dist && npm run test:karma:browsers",
-    "test:mocha:src": "mocha test --require src/synaptic.js ./test",
-    "test:mocha:dist": "mocha test --require dist/synaptic.js ./test",
-    "test:karma:browsers": "karma start --single-run --browsers Chrome,Firefox,SafariPrivate",
-    "test:karma:phantomjs": "karma start --single-run --browsers PhantomJS",
-    "test:travis": "npm run test:mocha:src && npm run build && npm run test:mocha:dist",
-    "build": "webpack --config webpack.config.js"
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js",
+    "mock": "node test/mock-site.js",
+    "test": "node --no-warnings --test test/*.test.js"
   },
-  "prepush": [
-    "test",
-    "build"
-  ],
-  "devDependencies": {
-    "chai": "^3.5.0",
-    "chai-stats": "^0.3.0",
-    "karma": "^1.1.2",
-    "karma-chrome-launcher": "^1.0.1",
-    "karma-firefox-launcher": "^1.0.0",
-    "karma-mocha": "^1.1.1",
-    "karma-phantomjs-launcher": "^1.0.1",
-    "karma-safari-launcher": "^1.0.0",
-    "karma-webpack": "^1.7.0",
-    "mocha": "^2.2.4",
-    "pre-push": "^0.1.1",
-    "webpack": "^1.13.1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/cazala/synaptic.git"
-  },
-  "keywords": [
-    "neural network",
-    "machine learning",
-    "long short term memory",
-    "perceptron",
-    "architecture free"
-  ],
-  "author": "Juan Cazala <juancazala@gmail.com> (http://juancazala.com/)",
-  "license": {
-    "type": "MIT",
-    "url": "https://github.com/cazala/synaptic/blob/master/LICENSE"
-  },
-  "bugs": {
-    "url": "https://github.com/cazala/synaptic/issues"
-  },
-  "homepage": "http://synaptic.juancazala.com",
   "engines": {
-    "node": ">=4"
+    "node": ">=22.5"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.130.0",
+    "cheerio": "^1.2.0",
+    "express": "^5.2.1",
+    "undici": "^7.30.0",
+    "zod": "^4.6.5"
   }
 }

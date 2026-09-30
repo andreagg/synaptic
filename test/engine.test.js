@@ -1,0 +1,76 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'synlib-'));
+process.env.REQUEST_DELAY_MS = '0';
+delete process.env.ANTHROPIC_API_KEY; // i test verificano le sole euristiche
+for (const k of ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy']) delete process.env[k];
+
+const { startMockSite, VOLUMES, PAGES } = await import('./mock-site.js');
+const { Books, Chapters } = await import('../src/db.js');
+const engine = await import('../src/engine/engine.js');
+
+let site;
+before(async () => { site = await startMockSite(4777); });
+after(() => site.server.close());
+
+const create = (p, extra = {}) => Books.create({ title: site.url + p, source_url: site.url + p, use_ai: false, ...extra });
+
+test('indice a volumi → tutti i capitoli, in ordine', async () => {
+  const b = create('/manga8/onepiece/volumi/lista-capitoli');
+  await engine.scanBook(b.id);
+  const chs = Chapters.list(b.id);
+  const expected = Object.values(VOLUMES).flat();
+  assert.deepEqual(chs.map((c) => c.sort_key), expected);
+  assert.match(chs[4].title, /^Capitolo 009 - /);
+  const book = Books.get(b.id);
+  assert.equal(book.title, 'One Piece - Lista capitoli');
+  assert.ok(book.rules.chapterPattern);
+});
+
+test('lettore una-pagina-per-URL → tutte le pagine senza pubblicità né capitolo successivo', async () => {
+  const b = Books.byUrl(site.url + '/manga8/onepiece/volumi/lista-capitoli');
+  const ch = Chapters.list(b.id).find((c) => c.sort_key === 9);
+  const r = await engine.resolveChapterNow(ch.id);
+  assert.equal(r.type, 'images');
+  assert.equal(r.content.images.length, PAGES);
+  r.content.images.forEach((u, i) => assert.ok(u.endsWith(`/002/009/0${i + 1}.jpg`), u));
+  assert.equal(Books.get(b.id).kind, 'manga');
+  assert.ok(Books.get(b.id).cover?.includes('/manga8/img/onepiece/001/001/01.jpg'));
+});
+
+test('aggiornamento: nuovi capitoli marcati come nuovi', async () => {
+  const b = Books.byUrl(site.url + '/manga8/onepiece/volumi/lista-capitoli');
+  site.state.extra.push(20, 21);
+  const res = await engine.scanBook(b.id);
+  assert.equal(res.added, 2);
+  const nuovi = Chapters.list(b.id).filter((c) => c.is_new);
+  assert.deepEqual(nuovi.map((c) => c.sort_key), [20, 21]);
+});
+
+test('pagine tutte nello stesso HTML con lazy-load', async () => {
+  const b = create('/fumetto/storia-breve');
+  await engine.scanBook(b.id);
+  const [ch] = Chapters.list(b.id);
+  const full = Chapters.get(ch.id);
+  assert.equal(full.type, 'images');
+  assert.equal(full.content.images.length, 6);
+});
+
+test('raccolta di PDF', async () => {
+  const b = create('/documenti');
+  await engine.scanBook(b.id);
+  const chs = Chapters.list(b.id);
+  assert.equal(chs.length, 3);
+  assert.ok(chs.every((c) => c.type === 'pdf'));
+  assert.equal(Books.get(b.id).kind, 'pdf');
+});
+
+test('download offline mette in cache tutte le immagini', async () => {
+  const existing = Books.byUrl(site.url + '/fumetto/storia-breve');
+  await engine.downloadBook(existing.id);
+  assert.match(Books.get(existing.id).message, /offline: 6 file/);
+});
