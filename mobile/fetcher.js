@@ -20,8 +20,14 @@ const IMG_HEADERS = {
   'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
   'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8', 'Sec-Fetch-Dest': 'image', 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Site': 'same-origin',
 };
-const CHALLENGE = /cf-chl|challenge-platform|cf_chl_opt|Just a moment\.\.\.|Checking your browser|Attention Required!|DDoS protection by|ddos-guard|Verifica di sicurezza|captcha-delivery/i;
-export const isChallenge = (html) => CHALLENGE.test(String(html || '').slice(0, 20000));
+// Pagina di verifica anti-bot: si riconosce dal titolo o da marcatori della challenge.
+// (Non basta "challenge-platform": Cloudflare inserisce quello script anche nelle pagine normali.)
+const CHALLENGE_TITLE = /<title>\s*(Just a moment|Ci siamo quasi|Un momento|Attention Required|Please Wait|Verifica|DDoS-Guard|Checking your browser)/i;
+const CHALLENGE_MARK = /cf_chl_opt|cf-chl-widget|challenges\.cloudflare\.com\/turnstile|ddos-guard\.net\/|captcha-delivery\.com/i;
+export const isChallenge = (html) => {
+  const h = String(html || '');
+  return CHALLENGE_TITLE.test(h.slice(0, 5000)) || (h.length < 60000 && CHALLENGE_MARK.test(h));
+};
 const PER_HOST = 3;
 
 const hosts = new Map();
@@ -57,7 +63,8 @@ async function request(url, { referer, binary = false, retries = 2 } = {}) {
           const r = await fetch(url, { redirect: 'follow' });
           res = { status: r.status, url: r.url, type: r.headers.get('content-type') || '', data: binary ? await r.blob() : await r.text() };
         }
-        if (res.status >= 500 || res.status === 429) throw new Error(`HTTP ${res.status}`);
+        console.log(`[http] ${res.status} ${binary ? 'media' : 'pagina'} ${url}`);
+        if (res.status >= 500 && res.status !== 503) throw new Error(`HTTP ${res.status}`);
         return res;
       } catch (e) {
         last = e;
@@ -82,6 +89,7 @@ export async function fetchPage(url, { referer, render = false } = {}) {
   const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '');
   // protezione anti-bot: apriamo la pagina in un browser vero (cookie condivisi con le richieste native)
   if (native && ([403, 503, 429].includes(res.status) || isChallenge(html))) {
+    console.log(`[verifica] ${url} protetto (HTTP ${res.status}): apro il browser interno`);
     return fetchViaWebView(url, { visible: true });
   }
   if (res.status >= 400) throw new Error(`HTTP ${res.status} su ${url}`);
@@ -101,12 +109,16 @@ export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
       clearInterval(poll); clearTimeout(timer);
       for (const h of handles) h.remove?.();
       await InAppBrowser.close().catch(() => {});
+      if (err) console.warn(`[browser] ${err.message}`);
       err ? reject(err) : resolve(value);
     };
     (async () => {
       handles.push(await InAppBrowser.addListener('messageFromWebview', (ev) => {
         const d = ev?.detail?.detail || ev?.detail || ev || {};
-        if (d.synHtml && !isChallenge(d.synHtml) && d.synReady) finish(null, { url: d.url || url, html: d.synHtml, contentType: 'text/html' });
+        if (!d.synHtml) return;
+        const blocked = isChallenge(d.synHtml);
+        console.log(`[browser] ${d.url} ${d.synHtml.length} byte, ${blocked ? 'ancora in verifica' : d.synReady ? 'pronta' : 'in caricamento'}`);
+        if (!blocked && d.synReady) finish(null, { url: d.url || url, html: d.synHtml, contentType: 'text/html' });
       }));
       handles.push(await InAppBrowser.addListener('closeEvent', () => finish(new Error('Verifica del sito annullata: riprova con "Cerca aggiornamenti"'))));
       await InAppBrowser.openWebView({
@@ -114,7 +126,9 @@ export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
         toolbarType: ToolBarType.COMPACT, visibleTitle: true, toolbarColor: '#14151a', toolbarTextColor: '#ffffff',
         isPresentAfterPageLoad: !visible,
       });
-      const code = `try{var h=document.documentElement.outerHTML;window.mobileApp.postMessage({detail:{synHtml:h,url:location.href,synReady:document.readyState==='complete'}})}catch(e){}`;
+      const code = `try{var m={detail:{synHtml:document.documentElement.outerHTML,url:location.href,synReady:document.readyState==='complete'}};`
+        + `if(window.mobileApp&&window.mobileApp.postMessage){window.mobileApp.postMessage(m)}else if(window.AndroidInterface){window.AndroidInterface.postMessage(JSON.stringify(m))}}catch(e){}`;
+      console.log(`[browser] aperto ${url}`);
       poll = setInterval(() => InAppBrowser.executeScript({ code }).catch(() => {}), 1500);
       timer = setTimeout(() => finish(new Error('Il sito non ha superato la verifica in tempo')), timeout);
     })().catch((e) => finish(e));

@@ -188,42 +188,40 @@ async function route() {
   try {
     if ((m = h.match(/^#\/book\/(\d+)/))) { await renderBook(m[1]); await api(`/books/${m[1]}/seen`, { method: 'POST' }).catch(() => {}); }
     else if ((m = h.match(/^#\/read\/(\d+)/))) await renderReader(m[1]);
+    else if (h.startsWith('#/settings') && backend.settings) await renderSettings();
     else { clearInterval(timer); await renderLibrary(); }
     if (!h.startsWith('#/read')) scrollTo(0, 0);
   } catch (e) { $view.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p></div>`; }
 }
 addEventListener('hashchange', route);
 await backend.init();
-window.addEventListener('synaptic:changed', () => { if (!location.hash.startsWith('#/read')) route(); });
+window.addEventListener('synaptic:changed', () => { if (!/^#\/(read|settings)/.test(location.hash)) route(); });
 route();
 
-// impostazioni (solo app mobile: chiave AI ecc.)
+// impostazioni (solo app mobile: chiave AI e registro diagnostico)
 if (backend.settings) {
-  const btn = document.createElement('button');
-  btn.className = 'btn'; btn.textContent = '⚙'; btn.title = 'Impostazioni';
+  const btn = document.createElement('a');
+  btn.className = 'btn'; btn.textContent = '⚙'; btn.title = 'Impostazioni'; btn.href = '#/settings';
   document.getElementById('addBtn').before(btn);
-  btn.onclick = async () => {
-    const cur = await backend.settings.get();
-    const key = prompt("Chiave API Anthropic per l'AI (lascia vuoto per disattivarla):", cur.ANTHROPIC_API_KEY || '');
-    if (key === null) return;
-    await backend.settings.set({ ANTHROPIC_API_KEY: key.trim() });
-    toast(key.trim() ? 'AI attivata' : 'AI disattivata');
+}
+async function renderSettings() {
+  clearInterval(timer);
+  document.body.classList.remove('reading');
+  const cur = await backend.settings.get();
+  $view.innerHTML = `<h2>Impostazioni</h2>
+    <label class="muted">Chiave API Anthropic (attiva l'AI per i siti difficili)
+      <input id="key" type="password" value="${esc(cur.ANTHROPIC_API_KEY || '')}" placeholder="sk-ant-…" style="margin-top:6px"></label>
+    <div class="row" style="margin:10px 0 24px"><button class="btn primary" id="save">Salva</button></div>
+    <div class="toolbar"><strong>Registro diagnostico</strong>
+      <div class="row"><button class="btn" id="copy">Copia</button><button class="btn" id="refresh">Aggiorna</button></div></div>
+    <pre id="log" style="white-space:pre-wrap;word-break:break-all;background:var(--panel);padding:12px;border-radius:12px;font-size:11px;max-height:60vh;overflow:auto"></pre>`;
+  const show = () => { const el = document.getElementById('log'); el.textContent = backend.logs?.() || '(vuoto)'; el.scrollTop = el.scrollHeight; };
+  show();
+  document.getElementById('refresh').onclick = show;
+  document.getElementById('copy').onclick = () => navigator.clipboard.writeText(backend.logs?.() || '').then(() => toast('Registro copiato'), () => toast('Copia non riuscita'));
+  document.getElementById('save').onclick = async () => {
+    const key = document.getElementById('key').value.trim();
+    await backend.settings.set({ ANTHROPIC_API_KEY: key });
+    toast(key ? 'AI attivata' : 'AI disattivata');
   };
 }
-
-// ---------------------------------------------------------------- aggiunta fonte
-const dlg = document.getElementById('addDialog');
-document.getElementById('addBtn').onclick = () => dlg.showModal();
-document.getElementById('addForm').addEventListener('submit', async (e) => {
-  if (e.submitter?.value !== 'ok') return;
-  const f = new FormData(e.target);
-  try {
-    const b = await api('/books', { method: 'POST', body: {
-      url: f.get('url'), title: f.get('title') || undefined, update_hours: Number(f.get('update_hours')),
-      use_ai: f.get('use_ai') === 'on', render_js: f.get('render_js') === 'on',
-    } });
-    e.target.reset();
-    toast('Fonte aggiunta: analisi in corso…');
-    location.hash = `#/book/${b.id}`;
-  } catch (err) { toast(err.message); }
-});

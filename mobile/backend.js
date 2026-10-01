@@ -13,6 +13,22 @@ pdfjs.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
 const fail = (status, message, data = {}) => { throw Object.assign(new Error(message), { status, data: { error: message, ...data } }); };
 const bg = (p) => { p.catch((e) => console.warn(e)); };
 
+// registro diagnostico: le ultime righe di console, visibili in ⚙
+const LOG_MAX = 400;
+const logLines = [];
+for (const level of ['log', 'warn', 'error']) {
+  const orig = console[level].bind(console);
+  console[level] = (...args) => {
+    const line = `${new Date().toLocaleTimeString('it-IT')} ${level === 'log' ? '' : level.toUpperCase() + ' '}${args.map((a) => (a instanceof Error ? a.message : typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}`;
+    logLines.push(line.slice(0, 500));
+    if (logLines.length > LOG_MAX) logLines.shift();
+    orig(...args);
+  };
+}
+window.addEventListener('error', (e) => console.error('[js]', e.message));
+window.addEventListener('unhandledrejection', (e) => console.error('[promise]', e.reason?.message || String(e.reason)));
+export const logs = () => logLines.join('\n');
+
 export async function init() {
   const s = (await idbGet('kv', 'settings').catch(() => null)) || {};
   globalThis.SYNAPTIC_CONFIG = s;
