@@ -1,0 +1,36 @@
+name: Probe sito reale
+
+on:
+  push:
+    branches: [ccr-ccb4605b-xmvyvd]
+    paths: ['test/probe.mjs', '.github/workflows/probe.yml']
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL da analizzare
+        default: https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm i --no-save playwright && npx playwright install --with-deps chromium
+      - name: Analisi del sito
+        run: node test/probe.mjs "${{ github.event.inputs.url || 'https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli' }}"
+        continue-on-error: true
+      - name: Pubblica i risultati sul branch probe-results
+        run: |
+          cd probe-out
+          git init -q && git checkout -q -b probe-results
+          git config user.name "probe-bot" && git config user.email "probe@users.noreply.github.com"
+          git add -A && git commit -qm "probe ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" probe-results
