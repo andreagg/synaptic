@@ -1,0 +1,549 @@
+{
+  "url": "https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli",
+  "steps": [
+    {
+      "k": "fetch-minimo",
+      "v": {
+        "status": 403,
+        "server": "cloudflare",
+        "cfRay": "a439b34eed33e62f-IAD",
+        "len": 5583,
+        "title": "Just a moment..."
+      }
+    },
+    {
+      "k": "fetch-browser",
+      "v": {
+        "status": 403,
+        "server": "cloudflare",
+        "cfRay": "a439b34f28e8989d-IAD",
+        "len": 5881,
+        "title": "Just a moment..."
+      }
+    },
+    {
+      "k": "pw-indice",
+      "v": {
+        "status": 200,
+        "finalUrl": "https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli",
+        "title": "Lista Capitoli One Piece: Leggi Scan Online | One Piece Power",
+        "len": 488468
+      }
+    },
+    {
+      "k": "cookies",
+      "v": [
+        "onepiecepower.com PHPSESSID",
+        "onepiecepower.com HstCfa4357832",
+        "onepiecepower.com HstCmu4357832",
+        "onepiecepower.com HstCnv4357832",
+        "onepiecepower.com HstCns4357832",
+        ".onepiecepower.com cf_clearance",
+        ".dtscout.com df",
+        ".dtscout.com l",
+        ".bartererfaxtingling.com auth",
+        "onepiecepower.com UGVyc2lzdFN0b3JhZ2U",
+        ".onepiecepower.com __dtsu",
+        "bartererfaxtingling.com cart",
+        "bartererfaxtingling.com cart_p",
+        "bartererfaxtingling.com CHCK",
+        "bartererfaxtingling.com PTS",
+        "bartererfaxtingling.com UID",
+        "onepiecepower.com __PPU_tuid",
+        "coosync.com SUID",
+        "bartererfaxtingling.com SUID",
+        "bartererfaxtingling.com DUID",
+        "onepiecepower.com __PPU_puid",
+        "onepiecepower.com HstCla4357832",
+        "onepiecepower.com HstPn4357832",
+        "onepiecepower.com HstPt4357832"
+      ]
+    },
+    {
+      "k": "motore-indice",
+      "v": {
+        "n": 1201,
+        "confidence": 1,
+        "pattern": "^https?://onepiecepower\\.com/manga\\d+/onepiece/volumi/reader/\\d+/?$",
+        "primi": [
+          {
+            "title": "Capitolo 000 - Strong World",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/000",
+            "sort_key": 0,
+            "meta": {
+              "volume": "000"
+            }
+          },
+          {
+            "title": "Capitolo 001 - Romance Dawn, l'alba di una grande avventura",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/001",
+            "sort_key": 1,
+            "meta": {
+              "volume": "001"
+            }
+          },
+          {
+            "title": "Capitolo 002 - Luffy, il ragazzo dal Cappello di Paglia",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/002",
+            "sort_key": 2,
+            "meta": {
+              "volume": "001"
+            }
+          },
+          {
+            "title": "Capitolo 003 - Zoro, il Cacciatore di Pirati",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/003",
+            "sort_key": 3,
+            "meta": {
+              "volume": "001"
+            }
+          },
+          {
+            "title": "Capitolo 004 - Il Grande Capitano Morgan",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/004",
+            "sort_key": 4,
+            "meta": {
+              "volume": "001"
+            }
+          }
+        ],
+        "ultimi": [
+          {
+            "title": "Capitolo 1198 - (Disponibile dal 06 Novembre 2026, C'è Pausa!)",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/1198",
+            "sort_key": 1198,
+            "meta": {
+              "volume": "117"
+            }
+          },
+          {
+            "title": "Capitolo 1199 - (Disponibile dal 13 Novembre 2026)",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/1199",
+            "sort_key": 1199,
+            "meta": {
+              "volume": "117"
+            }
+          },
+          {
+            "title": "Capitolo 1200 - (Disponibile dal 20 Novembre 2026)",
+            "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/1200",
+            "sort_key": 1200,
+            "meta": {
+              "volume": "117"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "k": "link-campione",
+      "v": [
+        " | /",
+        "Registrati / Accedi | /php/loginRegister.php",
+        "⚡ ACCEDI AI CONTENUTI VIP\n            Vuoi elimina | /vip/vip_page",
+        "🛒 SUPPORTACI GRATIS\n            Devi fare acquist | https://www.amazon.it/gp/search?ie=UTF8&tag=onepiecepower-21&linkCode=ur2&linkId=f5aedd6b4f690a9deac724a24bc25435&camp=3414&creative=21718&index=toys&keywords=one+piece",
+        "📱 L'ESPERIENZA DEFINITIVA\n            Scarica la  | https://play.google.com/store/apps/details?id=com.app.onepiecepower",
+        "⚔️ NUOVO GIOCO BY ONEPIECEPOWER!\n            Scopr | https://play.google.com/store/apps/details?id=com.oppower.op_triple_triad",
+        "◀ Clicca QUI per la Lista Completa Manga | ../lista-manga2",
+        "Per accedere ai Download di tutti i Pack dei Volum | /vip/home",
+        "Capitolo 1170 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1170.zip",
+        "Capitolo 1171 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1171.zip",
+        "Capitolo 1172 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1172.zip",
+        "Capitolo 1173 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1173.zip",
+        "Capitolo 1174 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1174.zip",
+        "Capitolo 1175 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1175.zip",
+        "Capitolo 1176 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1176.zip",
+        "Capitolo 1177 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1177.zip",
+        "Capitolo 1178 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1178.zip",
+        "Capitolo 1179 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1179.zip",
+        "Capitolo 1180 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1180.zip",
+        "Capitolo 1181 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1181.zip",
+        "Capitolo 1182 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1182.zip",
+        "Capitolo 1183 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1183.zip",
+        "Capitolo 1184 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1184.zip",
+        "Capitolo 1185 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1185.zip",
+        "Capitolo 1186 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1186.zip",
+        "Capitolo 1187 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1187.zip",
+        "Capitolo 1188 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1188.zip",
+        "Capitolo 1189 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1189.zip",
+        "Capitolo 1190 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1190.zip",
+        "Capitolo 1191 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1191.zip",
+        "Capitolo 1192 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1192.zip",
+        "Capitolo 1193 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1193.zip",
+        "Capitolo 1194 | http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1194.zip",
+        "QUI | /guide/download-volumi",
+        "Capitolo 000 - Strong World | reader/000",
+        "Capitolo 001 - Romance Dawn, l'alba di una grande  | reader/001",
+        "Capitolo 002 - Luffy, il ragazzo dal Cappello di P | reader/002",
+        "Capitolo 003 - Zoro, il Cacciatore di Pirati | reader/003",
+        "Capitolo 004 - Il Grande Capitano Morgan | reader/004",
+        "Capitolo 005 - Il Re dei Pirati e il Maestro Spada | reader/005",
+        "Capitolo 006 - Il primo compagno | reader/006",
+        "Capitolo 007 - Amici | reader/007",
+        "Capitolo 008 - Appare Nami | reader/008",
+        "Capitolo 009 - Femme fatale | reader/009",
+        "Capitolo 010 - Incidente al bar | reader/010",
+        "Capitolo 011 - Fuga | reader/011",
+        "Capitolo 012 - Il Cane | reader/012",
+        "Capitolo 013 - Tesoro | reader/013",
+        "Capitolo 014 - Imprudente | reader/014",
+        "Capitolo 015 - Gong | reader/015",
+        "Capitolo 016 - Versus! I pirati di Buggy! | reader/016",
+        "Capitolo 017 - Livelli diversi | reader/017",
+        "Capitolo 018 - Il pirata buggy il clown | reader/018",
+        "Capitolo 019 - Il frutto del diavolo | reader/019",
+        "Capitolo 020 - La via del ladro | reader/020",
+        "Capitolo 021 - Il villaggio | reader/021",
+        "Capitolo 022 - Sei una strana bestia | reader/022",
+        "Capitolo 023 - Ecco capitan Usopp | reader/023",
+        "Capitolo 024 - Qualcosa che non posso rinnegare | reader/024",
+        "Capitolo 025 - 800 bugie | reader/025",
+        "Capitolo 026 - Il piano di capitan kuro | reader/026",
+        "Capitolo 027 - Il piano | reader/027",
+        "Capitolo 028 - Luna crescente | reader/028",
+        "Capitolo 029 - La salita | reader/029",
+        "Capitolo 030 - Great! | reader/030",
+        "Capitolo 031 - Verità | reader/031",
+        "Capitolo 032 - Disastro | reader/032",
+        "Capitolo 033 - L'uomo silenzioso | reader/033",
+        "Capitolo 034 - Il maggiordomo Krahador | reader/034",
+        "Capitolo 035 - Una salita ostica | reader/035",
+        "Capitolo 036 - Inseguimento! | reader/036",
+        "Capitolo 037 - Il pirata kuro lo stratega | reader/037",
+        "Capitolo 038 - Pirati | reader/038",
+        "Capitolo 039 - Per chi suona la campana | reader/039",
+        "Capitolo 040 - La ciurma dei pirati di Usopp | reader/040",
+        "Capitolo 041 - Per mare | reader/041",
+        "Capitolo 042 - Yosaku e Johnny | reader/042",
+        "Capitolo 043 - Ecco Sanji | reader/043",
+        "Capitolo 044 - I tre cuochi | reader/044",
+        "Capitolo 045 - Prima della tempesta | reader/045"
+      ]
+    },
+    {
+      "k": "file",
+      "v": [
+        {
+          "url": "http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1170.zip",
+          "title": "Capitolo 1170",
+          "ext": "zip",
+          "order": 9
+        },
+        {
+          "url": "http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1171.zip",
+          "title": "Capitolo 1171",
+          "ext": "zip",
+          "order": 10
+        },
+        {
+          "url": "http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1172.zip",
+          "title": "Capitolo 1172",
+          "ext": "zip",
+          "order": 11
+        },
+        {
+          "url": "http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1173.zip",
+          "title": "Capitolo 1173",
+          "ext": "zip",
+          "order": 12
+        },
+        {
+          "url": "http://ouo.io/qs/VtC5tX5a?s=http://serverfile.club/manga/onepiece/volumi/download/[OPP]Cap-1174.zip",
+          "title": "Capitolo 1174",
+          "ext": "zip",
+          "order": 13
+        }
+      ]
+    },
+    {
+      "k": "pw-capitolo",
+      "v": {
+        "status": 200,
+        "finalUrl": "https://onepiecepower.com/manga8/onepiece/volumi/reader/009",
+        "title": "One Piece Capitolo 009 ITA",
+        "len": 79387
+      }
+    },
+    {
+      "k": "motore-immagini",
+      "v": {
+        "images": [
+          "https://onepiecepower.com/manga8/onepiece/volumi/volume002/009/01.jpg"
+        ],
+        "confidence": 0.3,
+        "single": true,
+        "pattern": "^https?://onepiecepower\\.com/manga\\d+/onepiece/volumi/volume\\d+/\\d+/\\d+\\.jpg/?$"
+      }
+    },
+    {
+      "k": "motore-pagine",
+      "v": [
+        {
+          "n": 8,
+          "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/008"
+        },
+        {
+          "n": 10,
+          "url": "https://onepiecepower.com/manga8/onepiece/volumi/reader/010"
+        }
+      ]
+    },
+    {
+      "k": "motore-next",
+      "v": null
+    },
+    {
+      "k": "immagini-scaricate-dal-browser",
+      "v": [
+        "200 https://onepiecepower.com/images/whatsapp.png",
+        "200 https://onepiecepower.com/images/instagram.png",
+        "200 https://onepiecepower.com/images/telegram.png",
+        "200 https://onepiecepower.com/images/tiktok.png",
+        "200 https://analytics.ozlinedsp.com/tracking/segment?key=duq6kfz",
+        "200 https://onepiecepower.com/php/user/avatar/SilverMine_1787171470.jpg",
+        "200 https://onepiecepower.com/php/user/avatar/BastardExpress.jpg",
+        "200 https://onepiecepower.com/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+        "200 https://onepiecepower.com/php/user/avatar/admin.png",
+        "200 https://onepiecepower.com/images/stripeLogo.png",
+        "200 https://onepiecepower.com/images/sfondo.webp",
+        "200 https://onepiecepower.com/images/logo.png",
+        "200 https://onepiecepower.com/images/search.png",
+        "200 https://onepiecepower.com/images/logoAmazon.png",
+        "200 https://onepiecepower.com/images/appOPP.png",
+        "200 https://onepiecepower.com/images/oppower_triple_triad.png",
+        "200 https://onepiecepower.com/images/home_title_sezioniAnime.png",
+        "200 https://onepiecepower.com/images/home_title_sezioniManga.png",
+        "200 https://onepiecepower.com/images/home_title_sezioniGuide.png",
+        "200 https://onepiecepower.com/images/whatsapp.png",
+        "200 https://onepiecepower.com/images/telegram.png",
+        "200 https://onepiecepower.com/images/instagram.png",
+        "200 https://onepiecepower.com/images/tiktok.png",
+        "200 https://onepiecepower.com/images/logo.png",
+        "200 https://onepiecepower.com/images/frecciasinistra.png",
+        "200 https://onepiecepower.com/images/capitolo_fullscreen_icon.jpg",
+        "200 https://onepiecepower.com/images/loadingGrande.gif",
+        "200 https://onepiecepower.com/images/home_sfondo_sezioniAnime.webp",
+        "200 https://onepiecepower.com/images/home_sfondo_sezioniManga.webp",
+        "200 https://onepiecepower.com/images/home_sfondo_sezioniGuide.webp",
+        "200 https://onepiecepower.com/images/frecciadestra.png",
+        "200 https://onepiecepower.com/images/arrowsx.png",
+        "200 https://onepiecepower.com/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+        "200 https://onepiecepower.com/php/user/avatar/admin.png",
+        "200 https://onepiecepower.com/php/user/avatar/SilverMine_1787171470.jpg",
+        "200 https://onepiecepower.com/php/user/avatar/BastardExpress.jpg",
+        "200 https://analytics.ozlinedsp.com/tracking/segment?key=duq6kfz",
+        "200 https://onepiecepower.com/manga8/onepiece/volumi/volume002/009/02.jpg",
+        "200 https://onepiecepower.com/images/arrowdx.png",
+        "200 https://onepiecepower.com/manga8/onepiece/volumi/volume002/009/01.jpg"
+      ]
+    },
+    {
+      "k": "script-inline-con-immagini",
+      "v": [
+        "\nconst pArray = [], tableArray = [], spanArray = [], trArray = [], tdArray = [], tdArrayColorText = [];\nconst toggle = document.getElementById('toggle');\nconst themeDarkChoosen = false;\nif (themeDarkChoosen) {\n\tdocument.getElementById('toggle').click();\n\tchangeTheme(themeDarkChoosen);\n}\n\nif (toggle) {\n\ttoggle.addEventListener('input', (e) => {\n\t\tconst isChecked = e.target.checked;\n\t\t$.ajax({\n\t\t\ttype: 'GET',\n\t\t\turl: window.location.href.split(location.pathname + location.search)[0]+\"/sections/updateDarkLightTheme.php\",\n\t\t\tdata: {isDark: isChecked},\n\t\t\tasync: true,\n\t\t\tsuccess: function (data) {},\n\t\t\terror: function (data) {}\n\t\t});\n\t\tchangeTheme(isChecked);\n\t});\n}\n\nfunction changeTheme(check) {\n\tif (check) {\n\t\tdocument.querySelectorAll(\"section\").forEach(section => {\n\t\t\tconst bg = getComputedStyle(section).backgroundColor;\n\n\t\t\tif (bg.includes(\"255, 255, 255\")) {\n\t\t\t\tsection.style.backgroundColor = \"black\";\n\t\t\t}\n\t\t});\n\t\tfor (let i = 0; i < document.querySelectorAll(\"div.card\").length; i++) {\n\t\t\tdocument.querySelectorAll(\"div.card\")[i].style[\"background-color\"] = \"black\";\n\t\t}\n\t\tfor (let i = 0; i < document.querySelectorAll(\"form\").length; i++) {\n\t\t\tif (document.querySelectorAll(\"form\")[i].style[\"background-color\"] == \"white\" || document.querySelectorAll(\"form\")[i].classList.contains(\"form-container\")) {\n\t\t\t\tdocument.querySelectorAll(\"form\")[i].style[\"background-color\"] = \"black\";\n\t\t\t\tdocument.querySelectorAll(\"form\")[i].style[\"color\"] = \"white\";\n\t\t\t\tfor (let j = 0; j < document.qu",
+        "\n\tconst urlBase = window.location.href.split(\"?\")[0].split(\"#\")[0];\n\tlet cap = window.location.href.split(\"reader/\")[1].split(\"?\")[0];\n\tif (cap.slice(-1) !== \"/\") cap += '/';\n\tconst vol = \"002\" + \"/\";\n\tconst titolo = \"Femme fatale\";\n\tlet page = 1;\n\n\t$('#titolo').text(`One Piece - Volume ${vol.split(\"/\")[0]} - Capitolo ${cap.split(\"/\")[0]}: ${titolo}`);\n\t$('#titoloCapitoloSezione').text(titolo.trim() ? titolo : 'Titolo Non Disponibile');\n\n\tconst url = urlBase.split('reader/')[0];\n\tconst imageCache = {}; // cache immagini precaricate\n\n\tfunction getPageLink(pageNumber) {\n\t\tlet capNum = cap.includes(\"-\") ? cap.replace(/^0/, '') : (parseInt(cap) < 10 ? cap.padStart(3, \"0\") : cap);\n\t\tlet p = pageNumber < 10 ? \"0\" + pageNumber : pageNumber;\n\t\treturn `${url}volume${vol}${capNum}${p}.jpg`;\n\t}\n\n\t// Preload asincrono\n\tfunction preloadImageAsync(pageNumber) {\n\t\tif (imageCache[pageNumber]) return; // già caricata\n\t\tconst img = new Image();\n\t\timg.src = getPageLink(pageNumber);\n\t\timg.onload = () => { imageCache[pageNumber] = img; };\n\t}\n\n\t// Mostra la pagina\n\tfunction showPage(pageNumber) {\n\t\tconst imgContainer = $('#page .inner img.open');\n\t\tconst loader = jQuery('#loader');\n\t\timgContainer.before(loader);\n\n\t\tif (imageCache[pageNumber]) {\n\t\t\timgContainer.attr('src', imageCache[pageNumber].src);\n\t\t\tif ($('#sliderPages img.open').length) {\n\t\t\t\t$('#sliderPages img.open').attr('src', imageCache[pageNumber].src);\n\t\t\t}\n\t\t\tloader.remove();\n\t\t} else {\n\t\t\tconst img = new Image();\n\t\t\timg.src = getPage"
+      ]
+    },
+    {
+      "k": "img-campione",
+      "v": [
+        {
+          "alt": "VIP",
+          "src": "/images/stripeLogo.png",
+          "style": "width:100%;height:auto;max-width:60px"
+        },
+        {
+          "alt": "Amazon",
+          "src": "/images/logoAmazon.png",
+          "style": "width:100%;height:auto;max-width:50px"
+        },
+        {
+          "alt": "App",
+          "src": "/images/appOPP.png",
+          "style": "width:100%;height:auto;max-width:50px"
+        },
+        {
+          "alt": "OPPOwer Triple Triad Android",
+          "src": "/images/oppower_triple_triad.png",
+          "style": "width:100%;height:auto;max-width:60px"
+        },
+        {
+          "id": "arrowSxChapter",
+          "src": "https://onepiecepower.com/images/arrowsx.png",
+          "class": "frecciasxC"
+        },
+        {
+          "class": "open",
+          "src": "https://onepiecepower.com/manga8/onepiece/volumi/volume002/009/01.jpg"
+        },
+        {
+          "id": "arrowDxChapter",
+          "src": "https://onepiecepower.com/images/arrowdx.png",
+          "class": "frecciadxC"
+        },
+        {
+          "src": "/images/capitolo_fullscreen_icon.jpg"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/admin.png",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/SilverMine_1787171470.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/Mugiwara_No_Rufy_1773001889.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "alt": "avatar",
+          "style": "vertical-align:middle;border-radius:25px;margin-right:5px",
+          "src": "/php/user/avatar/BastardExpress.jpg",
+          "width": "30px",
+          "height": "30px"
+        },
+        {
+          "src": "/images/home_title_sezioniAnime.png",
+          "alt": "ANIME",
+          "width": "211",
+          "height": "62",
+          "style": "max-width:85%;height:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.8));transition:transform 0.3s"
+        },
+        {
+          "src": "/images/home_title_sezioniManga.png",
+          "alt": "MANGA",
+          "width": "252",
+          "height": "61",
+          "style": "max-width:85%;height:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.8));transition:transform 0.3s"
+        },
+        {
+          "src": "/images/home_title_sezioniGuide.png",
+          "alt": "GUIDE",
+          "width": "189",
+          "height": "62",
+          "style": "max-width:85%;height:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.8));transition:transform 0.3s"
+        },
+        {
+          "src": "/images/whatsapp.png",
+          "alt": "WA",
+          "style": "width:24px;height:24px;margin-right:10px"
+        },
+        {
+          "src": "/images/telegram.png",
+          "alt": "TG",
+          "style": "width:24px;height:24px;margin-right:10px"
+        },
+        {
+          "src": "/images/instagram.png",
+          "alt": "IG",
+          "style": "width:24px;height:24px;margin-right:10px"
+        },
+        {
+          "src": "/images/tiktok.png",
+          "alt": "TK",
+          "style": "width:24px;height:24px;margin-right:10px"
+        },
+        {
+          "src": "/images/logo.png",
+          "alt": "One Piece Power",
+          "style": "width:140px;height:auto;margin-bottom:10px"
+        }
+      ]
+    },
+    {
+      "k": "select-campione",
+      "v": []
+    },
+    {
+      "k": "fetch-capitolo-con-cookie",
+      "v": {
+        "status": 403
+      }
+    },
+    {
+      "k": "fetch-immagine-senza-cookie",
+      "v": {
+        "img": "https://onepiecepower.com/manga8/onepiece/volumi/volume002/009/01.jpg",
+        "status": 200,
+        "type": "image/jpeg"
+      }
+    },
+    {
+      "k": "probe-sequenza",
+      "v": {
+        "10": true,
+        "18": false,
+        "19": false,
+        "20": false,
+        "25": false,
+        "40": false,
+        "01": true,
+        "02": true
+      }
+    },
+    {
+      "k": "schema-su-altri-capitoli",
+      "v": {
+        "0": "false https://onepiecepower.com/manga8/onepiece/volumi/volume000/000/01.jpg",
+        "1": "false https://onepiecepower.com/manga8/onepiece/volumi/volume001/001/01.jpg",
+        "100": "true https://onepiecepower.com/manga8/onepiece/volumi/volume012/100/01.jpg",
+        "1000": "true https://onepiecepower.com/manga8/onepiece/volumi/volume099/1000/01.jpg",
+        "1150": "true https://onepiecepower.com/manga8/onepiece/volumi/volume113/1150/01.jpg",
+        "1185": "true https://onepiecepower.com/manga8/onepiece/volumi/volume116/1185/01.jpg",
+        "1190": "true https://onepiecepower.com/manga8/onepiece/volumi/volume116/1190/01.jpg"
+      }
+    }
+  ]
+}
