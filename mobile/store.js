@@ -86,7 +86,7 @@ export const Chapters = {
   update(cid, fields) {
     const c = state.chapters.find((x) => x.id === Number(cid));
     if (!c) return;
-    for (const k of ['title', 'type', 'status', 'content', 'is_new', 'read_at', 'progress', 'error']) {
+    for (const k of ['title', 'type', 'status', 'content', 'is_new', 'read_at', 'progress', 'error', 'meta']) {
       if (fields[k] !== undefined) c[k] = copy(fields[k]);
     }
     persist();

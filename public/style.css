@@ -69,7 +69,7 @@ body.reading .topbar { display: none; } body.reading main { max-width: none; pad
 .topbar .row { flex-wrap: nowrap; }
 @media (max-width: 420px) { .brand { font-size: 16px; } .brand span + * { display: none; } }
 
-html, body { overflow-x: hidden; }
+body { overflow-x: clip; }
 .hero { grid-template-columns: 160px minmax(0, 1fr); }
 .hero > div { min-width: 0; }
 .status span, .hero .src { overflow-wrap: anywhere; word-break: break-word; }
@@ -81,3 +81,14 @@ html, body { overflow-x: hidden; }
 .chap-head { padding: 14px 16px; text-align: center; font-weight: 600; background: var(--panel); color: var(--muted); border-top: 3px solid var(--accent); }
 .pages .pg { min-height: 120px; background: #0c0c0e; }
 .pages .pg img { display: block; width: 100%; }
+
+/* selezione capitoli */
+.check-box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid #4a4f5e; display: inline-flex; align-items: center; justify-content: center; flex: none; font-size: 14px; font-weight: 700; color: #1a1106; }
+.check-box.on { background: var(--accent); border-color: var(--accent); }
+.sel-tools { margin: 0 0 10px; }
+.selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: rgba(29,31,38,.97); border-top: 1px solid #353945; }
+.chapters.selecting { margin-bottom: 80px; }
+.chapters .pill { flex: none; }
+.desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.reader-bar .pgnum { font-size: 12px; color: var(--muted); white-space: nowrap; }

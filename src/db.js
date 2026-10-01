@@ -126,12 +126,12 @@ export const Chapters = {
     return added;
   },
   update(id, fields) {
-    const allowed = ['title', 'type', 'status', 'content', 'is_new', 'read_at', 'progress', 'error'];
+    const allowed = ['title', 'type', 'status', 'content', 'is_new', 'read_at', 'progress', 'error', 'meta'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return;
     const vals = keys.map((k) => {
       const v = fields[k];
-      if (k === 'content') return json(v);
+      if (k === 'content' || k === 'meta') return json(v);
       if (typeof v === 'boolean') return v ? 1 : 0;
       return v ?? null;
     });

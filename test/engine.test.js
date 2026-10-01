@@ -99,3 +99,14 @@ test('schema immagini appreso: gli altri capitoli si scaricano senza aprire la p
   assert.ok(r.content.images[0].endsWith('/op2/volume003/017/01.jpg'), r.content.images[0]);
   assert.equal(Books.get(b.id).rules.imageTemplate, site.url + '/op2/volume{vol:3}/{cap:3}/{page:2}.jpg');
 });
+
+test('coda di download: i capitoli scelti diventano disponibili offline con il numero di pagine', async () => {
+  const b = Books.byUrl(site.url + '/op2/lista-capitoli');
+  const ids = Chapters.list(b.id).filter((c) => [11, 12].includes(c.sort_key)).map((c) => c.id);
+  engine.queueDownload(b.id, ids);
+  for (let i = 0; i < 50 && engine.queuedIds(b.id).length; i++) await new Promise((r) => setTimeout(r, 100));
+  const chs = Chapters.list(b.id).filter((c) => ids.includes(c.id));
+  assert.ok(chs.every((c) => c.meta.offline), JSON.stringify(chs.map((c) => c.meta)));
+  assert.deepEqual(chs.map((c) => c.meta.pages), [PAGES + 11 % 3, PAGES + 12 % 3]);
+  assert.match(Books.get(b.id).message, /2 capitoli disponibili offline/);
+});

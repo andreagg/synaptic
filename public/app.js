@@ -22,24 +22,50 @@ const ICON = { images: '🖼️', pdf: '📄', file: '📦', html: '📰', page:
 let timer = null;
 const poll = (fn, ms = 2000) => { clearInterval(timer); timer = setInterval(fn, ms); };
 
+// Ridisegna la vista solo se è cambiata, mantenendo la posizione di scorrimento.
+let lastHtml = '';
+function setView(html) {
+  if (html === lastHtml) return false;
+  const y = scrollY;
+  const q = document.activeElement?.id === 'q' ? document.activeElement : null;
+  const caret = q?.selectionStart;
+  $view.innerHTML = html;
+  lastHtml = html;
+  hydrate();
+  scrollTo(0, y);
+  if (q) { const n = document.getElementById('q'); n?.focus(); n?.setSelectionRange(caret, caret); }
+  return true;
+}
+// Aggiorna la schermata corrente senza perdere lo scroll (dati cambiati, polling, ricerca).
+let refreshing = false;
+async function refresh() {
+  const h = location.hash || '#/';
+  if (refreshing || /^#\/(read|settings)/.test(h) || document.querySelector('dialog[open]')) return;
+  refreshing = true;
+  try {
+    const m = h.match(/^#\/book\/(\d+)/);
+    if (m) await renderBook(m[1]); else if (h === '#/' || h === '#' || h === '') await renderLibrary();
+  } catch { /* riprova al prossimo aggiornamento */ } finally { refreshing = false; }
+}
+
 // ---------------------------------------------------------------- libreria
 async function renderLibrary() {
   document.body.classList.remove('reading');
   const books = await api('/books');
   if (!books.length) {
-    $view.innerHTML = `<div class="empty"><div class="big">📚</div><h2>La tua libreria è vuota</h2>
+    setView(`<div class="empty"><div class="big">📚</div><h2>La tua libreria è vuota</h2>
       <p>Aggiungi l'indirizzo di un sito con fumetti, capitoli, PDF o articoli:<br>verrà trasformato in un libro da leggere qui.</p>
-      <button class="btn primary" onclick="document.getElementById('addBtn').click()">+ Aggiungi la prima fonte</button></div>`;
+      <button class="btn primary" onclick="document.getElementById('addBtn').click()">+ Aggiungi la prima fonte</button></div>`);
     return;
   }
-  $view.innerHTML = `<div class="grid">${books.map((b) => `
+  setView(`<div class="grid">${books.map((b) => `
     <a class="card" href="#/book/${b.id}">
       ${b.new_count ? `<span class="badge">+${b.new_count}</span>` : ''}
       <div class="cover" ${b.cover ? mediaAttr(b.cover, b.source_url) : ''}>${b.cover ? '' : '📘'}</div>
       <div class="info"><h3>${esc(b.title)}</h3>
         <div class="meta">${statusPill(b)} ${b.chapter_count} elem. · letti ${b.read_count}</div></div>
-    </a>`).join('')}</div>`;
-  if (books.some((b) => b.busy || ['scanning', 'downloading'].includes(b.status))) poll(renderLibrary, 2500);
+    </a>`).join('')}</div>`);
+  if (books.some((b) => b.busy || ['scanning', 'downloading'].includes(b.status))) poll(refresh, 2500); else clearInterval(timer);
 }
 function statusPill(b) {
   if (b.busy || b.status === 'scanning') return '<span class="pill busy">analisi…</span>';
@@ -51,65 +77,122 @@ function statusPill(b) {
 // ---------------------------------------------------------------- libro
 let filter = '';
 let sortDesc = false;
+let selecting = false;
+const selected = new Set();
+let bookCache = null;
+
+function chapterRow(c, queued) {
+  const m = c.meta || {};
+  const state = queued.has(c.id) ? '<span class="pill busy">⏳ in coda</span>'
+    : m.offline ? `<span class="pill ok">📥 ${m.pages ? m.pages + ' p.' : 'offline'}</span>`
+    : m.pages ? `<span class="pill">${m.pages} p.</span>` : '';
+  const check = selecting ? `<span class="check-box ${selected.has(c.id) ? 'on' : ''}">${selected.has(c.id) ? '✓' : ''}</span>` : '';
+  return `<li class="${c.read_at ? 'read' : ''}"><a href="#/read/${c.id}" data-id="${c.id}">
+      ${check}<span class="ico">${c.status === 'error' ? '⚠️' : ICON[c.type] || '•'}</span>
+      <span class="t">${esc(c.title)}</span>
+      ${c.is_new ? '<span class="dot" title="Nuovo"></span>' : ''}
+      ${state}${c.read_at ? '<span class="pill ok">✓</span>' : ''}
+    </a></li>`;
+}
+
 async function renderBook(id) {
   document.body.classList.remove('reading');
   const b = await api(`/books/${id}`);
+  bookCache = b;
   const busy = b.busy || ['scanning', 'downloading'].includes(b.status);
+  const queued = new Set(b.queued || []);
   let chs = b.chapters;
   if (filter) chs = chs.filter((c) => c.title.toLowerCase().includes(filter.toLowerCase()));
   if (sortDesc) chs = [...chs].reverse();
   const lastRead = [...b.chapters].filter((c) => c.read_at).sort((x, y) => y.read_at - x.read_at)[0];
   const cont = lastRead || b.chapters[0];
-  $view.innerHTML = `
+  const offlineCount = b.chapters.filter((c) => c.meta?.offline).length;
+  const html = `
     <section class="hero">
       <div class="cover" ${b.cover ? mediaAttr(b.cover, b.source_url) : ''}>${b.cover ? '' : '📘'}</div>
       <div>
         <h1>${esc(b.title)}</h1>
         <div class="src"><a href="${esc(b.source_url)}" target="_blank" rel="noopener">${esc(b.source_url)}</a></div>
-        <p class="muted">${esc(b.description || '')}</p>
+        <p class="muted desc">${esc(b.description || '')}</p>
         <div class="row">
           ${cont ? `<a class="btn primary" href="#/read/${cont.id}">${lastRead ? '▶ Continua' : '▶ Inizia a leggere'}</a>` : ''}
-          <button class="btn" id="scan" ${busy ? 'disabled' : ''}>⟳ Cerca aggiornamenti</button>
-          <button class="btn" id="dl" ${busy ? 'disabled' : ''}>⬇ Scarica offline</button>
+          <button class="btn" data-act="scan" ${busy ? 'disabled' : ''}>⟳ Cerca aggiornamenti</button>
+          <button class="btn" data-act="select">${selecting ? '✕ Annulla selezione' : '⬇ Scegli capitoli da scaricare'}</button>
         </div>
-        <div class="status">${busy ? '<span class="spinner"></span>' : ''}<span>${esc(b.message || '')}</span></div>
+        <div class="status">${busy || queued.size ? '<span class="spinner"></span>' : ''}<span>${esc(b.message || '')}</span></div>
         <div class="row muted" style="font-size:13px">
-          <span>${KIND[b.kind] || ''}</span> ·
-          <label>Aggiorna <select id="every" style="width:auto;padding:4px 8px">
+          <span>${KIND[b.kind] || ''}${offlineCount ? ` · 📥 ${offlineCount} offline` : ''}</span> ·
+          <label>Aggiorna <select data-act="every" style="width:auto;padding:4px 8px">
             ${[[0, 'mai'], [1, 'ogni ora'], [6, 'ogni 6 ore'], [24, 'ogni giorno'], [168, 'ogni settimana']]
               .map(([v, l]) => `<option value="${v}" ${Number(b.update_hours) === v ? 'selected' : ''}>${l}</option>`).join('')}
-          </select></label> ·
-          <label class="check" style="display:inline-flex"><input type="checkbox" id="ai" ${b.use_ai ? 'checked' : ''}> AI</label>
-          <label class="check" style="display:inline-flex"><input type="checkbox" id="js" ${b.render_js ? 'checked' : ''}> JS</label>
-          <button class="btn danger" id="del" style="padding:4px 10px">Elimina</button>
+          </select></label>
+          <label class="check" style="display:inline-flex"><input type="checkbox" data-act="ai" ${b.use_ai ? 'checked' : ''}> AI</label>
+          <label class="check" style="display:inline-flex"><input type="checkbox" data-act="js" ${b.render_js ? 'checked' : ''}> JS</label>
+          <button class="btn danger" data-act="del" style="padding:4px 10px">Elimina</button>
         </div>
       </div>
     </section>
+    ${!b.chapters.length && !busy ? `<div class="empty" style="padding:24px"><p>Nessun capitolo ancora.</p><button class="btn primary" data-act="scan">⟳ Cerca i capitoli</button></div>` : ''}
     <div class="toolbar">
-      <strong>${b.chapters.length} elementi${b.chapters.some((c) => c.is_new) ? ` · <span style="color:var(--accent)">${b.chapters.filter((c) => c.is_new).length} nuovi</span>` : ''}</strong>
-      <div class="row"><input id="q" placeholder="Cerca…" value="${esc(filter)}"><button class="btn" id="sort">${sortDesc ? '↑' : '↓'}</button></div>
+      <strong>${b.chapters.length} capitoli${b.chapters.some((c) => c.is_new) ? ` · <span style="color:var(--accent)">${b.chapters.filter((c) => c.is_new).length} nuovi</span>` : ''}</strong>
+      <div class="row"><input id="q" placeholder="Cerca…" value="${esc(filter)}"><button class="btn" data-act="sort">${sortDesc ? '↑' : '↓'}</button></div>
     </div>
-    ${!b.chapters.length && !busy ? `<div class="empty" style="padding:24px"><p>Nessun capitolo ancora.</p><button class="btn primary" onclick="document.getElementById('scan').click()">⟳ Cerca i capitoli</button></div>` : ''}
-    <ul class="chapters">${chs.map((c) => `
-      <li class="${c.read_at ? 'read' : ''}"><a href="#/read/${c.id}">
-        <span class="ico">${c.status === 'error' ? '⚠️' : ICON[c.type] || '•'}</span>
-        <span class="t">${esc(c.title)}</span>
-        ${c.is_new ? '<span class="dot" title="Nuovo"></span>' : ''}
-        ${c.read_at ? '<span class="pill ok">letto</span>' : ''}
-      </a></li>`).join('')}</ul>`;
-  hydrate();
-
-  const q = document.getElementById('q');
-  q.oninput = () => { filter = q.value; renderBook(id).then(() => { const n = document.getElementById('q'); n.focus(); n.setSelectionRange(filter.length, filter.length); }); };
-  document.getElementById('sort').onclick = () => { sortDesc = !sortDesc; renderBook(id); };
-  document.getElementById('scan').onclick = async () => { await api(`/books/${id}/scan`, { method: 'POST' }); toast('Controllo aggiornamenti avviato'); setTimeout(() => renderBook(id), 300); };
-  document.getElementById('dl').onclick = async () => { await api(`/books/${id}/download`, { method: 'POST' }); toast('Download avviato'); setTimeout(() => renderBook(id), 300); };
-  document.getElementById('every').onchange = (e) => api(`/books/${id}`, { method: 'PATCH', body: { update_hours: Number(e.target.value) } }).then(() => toast('Salvato'));
-  document.getElementById('ai').onchange = (e) => api(`/books/${id}`, { method: 'PATCH', body: { use_ai: e.target.checked } });
-  document.getElementById('js').onchange = (e) => api(`/books/${id}`, { method: 'PATCH', body: { render_js: e.target.checked } });
-  document.getElementById('del').onclick = async () => { if (confirm('Eliminare questo libro dalla libreria?')) { await api(`/books/${id}`, { method: 'DELETE' }); location.hash = '#/'; } };
-  if (busy) poll(() => renderBook(id), 2000); else clearInterval(timer);
+    ${selecting ? `<div class="row sel-tools">
+      <button class="btn" data-act="sel-next">Prossimi 10 da leggere</button>
+      <button class="btn" data-act="sel-all">Tutti${filter ? ' (filtrati)' : ''}</button>
+      <button class="btn" data-act="sel-none">Nessuno</button></div>` : ''}
+    <ul class="chapters ${selecting ? 'selecting' : ''}">${chs.map((c) => chapterRow(c, queued)).join('')}</ul>
+    ${selecting ? `<div class="selbar"><span>${selected.size} selezionati</span>
+      <button class="btn primary" data-act="sel-go" ${selected.size ? '' : 'disabled'}>⬇ Scarica offline</button></div>` : ''}`;
+  setView(html);
+  if (busy || queued.size) poll(refresh, 2000); else clearInterval(timer);
 }
+
+// azioni della scheda libro (delegate: sopravvivono ai ridisegni)
+$view.addEventListener('click', async (e) => {
+  const b = bookCache;
+  if (!b || !location.hash.startsWith('#/book/')) return;
+  const link = e.target.closest('.chapters a[data-id]');
+  if (link && selecting) {
+    e.preventDefault();
+    const cid = Number(link.dataset.id);
+    selected.has(cid) ? selected.delete(cid) : selected.add(cid);
+    return refresh();
+  }
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (!act || e.target.closest('select, input')) return;
+  const visible = () => b.chapters.filter((c) => !filter || c.title.toLowerCase().includes(filter.toLowerCase()));
+  if (act === 'scan') { await api(`/books/${b.id}/scan`, { method: 'POST' }); toast('Controllo aggiornamenti avviato'); setTimeout(refresh, 300); }
+  if (act === 'select') { selecting = !selecting; selected.clear(); refresh(); }
+  if (act === 'sort') { sortDesc = !sortDesc; refresh(); }
+  if (act === 'sel-all') { visible().forEach((c) => selected.add(c.id)); refresh(); }
+  if (act === 'sel-none') { selected.clear(); refresh(); }
+  if (act === 'sel-next') {
+    const lastRead = [...b.chapters].filter((c) => c.read_at).sort((x, y) => y.read_at - x.read_at)[0];
+    const start = lastRead ? b.chapters.findIndex((c) => c.id === lastRead.id) : 0;
+    b.chapters.slice(start, start + 10).forEach((c) => selected.add(c.id));
+    refresh();
+  }
+  if (act === 'sel-go') {
+    const ids = b.chapters.filter((c) => selected.has(c.id)).map((c) => c.id);
+    await api(`/books/${b.id}/download`, { method: 'POST', body: { chapters: ids } });
+    toast(`${ids.length} capitoli in download`);
+    selecting = false; selected.clear(); setTimeout(refresh, 300);
+  }
+  if (act === 'del' && confirm('Eliminare questo libro dalla libreria?')) { await api(`/books/${b.id}`, { method: 'DELETE' }); location.hash = '#/'; }
+});
+$view.addEventListener('change', (e) => {
+  const b = bookCache; const act = e.target.dataset?.act;
+  if (!b || !act) return;
+  if (act === 'every') api(`/books/${b.id}`, { method: 'PATCH', body: { update_hours: Number(e.target.value) } }).then(() => toast('Salvato'));
+  if (act === 'ai') api(`/books/${b.id}`, { method: 'PATCH', body: { use_ai: e.target.checked } });
+  if (act === 'js') api(`/books/${b.id}`, { method: 'PATCH', body: { render_js: e.target.checked } });
+});
+$view.addEventListener('input', (e) => {
+  if (e.target.id !== 'q') return;
+  filter = e.target.value;
+  refresh(true);
+});
 
 // ---------------------------------------------------------------- lettore
 async function renderReader(id) {
@@ -191,6 +274,9 @@ function continuousReader(first) {
   const tail = document.getElementById('tail');
   const rbar = document.getElementById('rbar'); const prog = document.getElementById('prog');
   const titleEl = document.getElementById('rtitle');
+  const pgEl = document.createElement('span');
+  pgEl.className = 'pgnum'; pgEl.textContent = `1/${first.content.images.length}`;
+  document.getElementById('rprev').before(pgEl);
   const loaded = [];
   let last = first; let current = first; let loading = false;
 
@@ -207,7 +293,9 @@ function continuousReader(first) {
       `<div class="pg"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.classList.add('loaded')"></div>`).join('');
     pagesEl.appendChild(sec);
     sec.querySelectorAll('img[data-m]').forEach((img) => lazy.observe(img));
-    loaded.push({ ch: c, el: sec });
+    loaded.push({ ch: c, el: sec, imgs: [...sec.querySelectorAll('.pg')] });
+    // download "live": il capitolo successivo si scarica in background mentre leggi
+    if (c.next) api(`/books/${first.book.id}/download`, { method: 'POST', body: { chapters: [c.next.id], prefetch: true } }).catch(() => {});
   };
 
   const loadNext = async () => {
@@ -253,6 +341,9 @@ function continuousReader(first) {
     const r = cur.el.getBoundingClientRect();
     const p = Math.max(0, Math.min(1, (probe - r.top) / Math.max(1, r.height - innerHeight * 0.7)));
     if (prog) prog.style.width = (p * 100) + '%';
+    let pg = 0;
+    for (let i = 0; i < cur.imgs.length; i++) if (cur.imgs[i].getBoundingClientRect().top <= probe) pg = i + 1;
+    pgEl.textContent = `${Math.max(1, pg)}/${cur.imgs.length}`;
     if (cur.ch.id !== current.id) {
       api(`/chapters/${current.id}/progress`, { method: 'POST', body: { progress: 1 } }).catch(() => {});
       current = cur.ch;
@@ -276,7 +367,8 @@ function continuousReader(first) {
 
 // ---------------------------------------------------------------- router
 async function route() {
-  window.onscroll = null; $view.onclick = null;
+  window.onscroll = null; $view.onclick = null; lastHtml = '';
+  if (!location.hash.startsWith('#/book/')) { selecting = false; selected.clear(); }
   const h = location.hash || '#/';
   let m;
   try {
@@ -306,7 +398,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
 addEventListener('hashchange', route);
 await backend.init();
-window.addEventListener('synaptic:changed', () => { if (!/^#\/(read|settings)/.test(location.hash)) route(); });
+window.addEventListener('synaptic:changed', () => refresh());
 route();
 
 // impostazioni (solo app mobile: chiave AI e registro diagnostico)

@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'node:path';
 import { Books, Chapters } from './src/db.js';
-import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy } from './src/engine/engine.js';
+import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds } from './src/engine/engine.js';
 import { aiAvailable } from './src/engine/ai.js';
 import { getMedia } from './src/fetcher.js';
 import { startScheduler } from './src/scheduler.js';
@@ -32,7 +32,7 @@ app.post('/api/books', wrap(async (req, res) => {
 
 app.get('/api/books/:id', (req, res) => {
   const b = bookOr404(req, res); if (!b) return;
-  res.json({ ...b, busy: isBusy(b.id), chapters: Chapters.list(b.id) });
+  res.json({ ...b, busy: isBusy(b.id), queued: queuedIds(b.id), chapters: Chapters.list(b.id) });
 });
 
 app.patch('/api/books/:id', (req, res) => {
@@ -52,6 +52,11 @@ app.post('/api/books/:id/scan', (req, res) => {
 });
 app.post('/api/books/:id/download', (req, res) => {
   const b = bookOr404(req, res); if (!b) return;
+  const ids = req.body?.chapters;
+  if (Array.isArray(ids)) {
+    const list = req.body.prefetch ? ids.filter((id) => !Chapters.get(Number(id))?.meta?.offline) : ids;
+    return res.status(202).json({ queued: list.length ? queueDownload(b.id, list) : 0 });
+  }
   downloadBook(b.id).catch(() => {}); res.status(202).json({ ok: true });
 });
 app.post('/api/books/:id/seen', (req, res) => {

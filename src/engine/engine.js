@@ -203,7 +203,9 @@ async function resolveChapter(chapterId, force) {
       }
     }
     if (res.rules || rules.imageTemplates !== fresh.rules?.imageTemplates) Books.update(book.id, { rules });
-    Chapters.update(ch.id, { type: res.type, content: res.content, status: 'ready', error: null });
+    const pages = res.type === 'images' ? res.content.images.length : null;
+    Chapters.update(ch.id, { type: res.type, content: res.content, status: 'ready', error: null,
+      meta: { ...(ch.meta || {}), ...(pages ? { pages } : {}) } });
     if (book.kind === 'unknown' || book.kind === 'series') {
       Books.update(book.id, { kind: res.type === 'images' ? 'manga' : res.type === 'pdf' ? 'pdf' : res.type === 'html' ? 'article' : 'mixed' });
     }
@@ -483,4 +485,58 @@ export async function downloadBook(bookId) {
     }
     return Books.get(book.id);
   });
+}
+
+// ---------------------------------------------------------------------------
+// 5. Coda di download offline dei capitoli scelti
+// ---------------------------------------------------------------------------
+const queues = new Map(); // bookId -> { ids: [], running, done }
+
+export function queuedIds(bookId) {
+  const q = queues.get(Number(bookId));
+  return q ? [...q.ids, ...(q.current ? [q.current] : [])] : [];
+}
+
+/** Mette in coda i capitoli da rendere disponibili offline (analisi + download di tutte le pagine). */
+export function queueDownload(bookId, ids) {
+  bookId = Number(bookId);
+  let q = queues.get(bookId);
+  if (!q) { q = { ids: [], running: false, done: 0, current: null }; queues.set(bookId, q); }
+  for (const id of ids.map(Number)) if (!q.ids.includes(id) && q.current !== id) q.ids.push(id);
+  if (!q.running) runQueue(bookId, q).catch((e) => console.error(e));
+  return q.ids.length;
+}
+
+async function runQueue(bookId, q) {
+  q.running = true; q.done = 0;
+  while (q.ids.length) {
+    const id = q.ids.shift();
+    q.current = id;
+    const total = q.done + q.ids.length + 1;
+    try {
+      const ch = await resolveChapterNow(id);
+      if (ch) {
+        await cacheChapter(ch, (i, n) => Books.update(bookId, { message: `⬇ ${q.done + 1}/${total} · ${ch.title} · pagina ${i}/${n}` }));
+      }
+    } catch (e) {
+      console.warn(`[download] capitolo ${id}: ${e.message}`);
+    }
+    q.done++;
+  }
+  q.current = null; q.running = false;
+  Books.update(bookId, { message: `✓ Download completato: ${q.done} capitoli disponibili offline` });
+}
+
+/** Scarica in cache tutte le pagine (o il file) di un capitolo già risolto. */
+export async function cacheChapter(ch, onProgress = () => {}) {
+  const ref = ch.content?.referer || ch.url;
+  const urls = ch.type === 'images' ? ch.content.images : ch.content?.url ? [ch.content.url] : [];
+  let n = 0; let failed = 0;
+  await mapLimit(urls, 4, async (u) => {
+    if (!isCached(u)) await getMedia(u, ref).catch(() => failed++);
+    onProgress(++n, urls.length);
+  });
+  const fresh = Chapters.get(ch.id);
+  Chapters.update(ch.id, { meta: { ...(fresh?.meta || {}), pages: ch.type === 'images' ? urls.length : fresh?.meta?.pages, offline: urls.length > 0 && failed === 0 } });
+  return { total: urls.length, failed };
 }

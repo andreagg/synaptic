@@ -4,7 +4,7 @@ import { App } from '@capacitor/app';
 import * as pdfjs from 'pdfjs-dist';
 import { initStore, Books, Chapters } from './store.js';
 import { initMedia, getMedia, mediaObjectUrl, needsBrowser } from './fetcher.js';
-import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy } from '../src/engine/engine.js';
+import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds } from '../src/engine/engine.js';
 import { aiAvailable } from '../src/engine/ai.js';
 import { idbGet, idbSet } from './idb.js';
 
@@ -76,14 +76,25 @@ export async function api(path, opts = {}) {
     const b = Books.get(m[1]);
     if (!b) fail(404, 'Libro non trovato');
     const action = m[2];
-    if (!action && method === 'GET') return { ...b, busy: isBusy(b.id), chapters: Chapters.list(b.id) };
+    if (!action && method === 'GET') return { ...b, busy: isBusy(b.id), queued: queuedIds(b.id), chapters: Chapters.list(b.id) };
     if (!action && method === 'PATCH') {
       const { title, update_hours, use_ai, render_js, rules } = body;
       return Books.update(b.id, { title, update_hours, use_ai, render_js, rules });
     }
     if (!action && method === 'DELETE') { Books.remove(b.id); return null; }
     if (action === 'scan') { bg(scanBook(b.id)); return { ok: true }; }
-    if (action === 'download') { bg(downloadBook(b.id)); return { ok: true }; }
+    if (action === 'download') {
+      if (!Array.isArray(body.chapters)) { bg(downloadBook(b.id)); return { ok: true }; }
+      let ids = body.chapters.map(Number);
+      // precaricamento durante la lettura: solo capitoli che non richiedono il browser interno
+      if (body.prefetch) {
+        ids = ids.filter((id) => {
+          const c = Chapters.get(id);
+          return c && !c.meta?.offline && (c.status === 'ready' || b.rules?.imageTemplate || !needsBrowser(c.url));
+        });
+      }
+      return { queued: ids.length ? queueDownload(b.id, ids) : 0 };
+    }
     if (action === 'seen') { Chapters.clearNew(b.id); return { ok: true }; }
   }
   if ((m = p.match(/^\/chapters\/(\d+)$/))) {
