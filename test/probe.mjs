@@ -31,10 +31,19 @@ for (const [name, headers] of [
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 412, height: 915 }, locale: 'it-IT' });
 const page = await ctx.newPage();
+const imgResponses = [];
+page.on('response', (r) => { if (r.request().resourceType() === 'image') imgResponses.push(`${r.status()} ${r.url()}`); });
 const visit = async (u, name) => {
   const resp = await page.goto(u, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => ({ status: () => 'ERR ' + e.message }));
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  // attende che la verifica Cloudflare finisca (la pagina si ricarica da sola)
+  for (let i = 0; i < 25; i++) {
+    const t = await page.title().catch(() => '');
+    if (!/Just a moment|Ci siamo quasi|Un momento|Attention/i.test(t)) break;
+    await page.waitForTimeout(2000);
+  }
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(2000);
   const html = await page.content();
   save(`${name}.html`, html);
   await page.screenshot({ path: `${out}/${name}.png`, fullPage: false });
@@ -58,6 +67,12 @@ if (list?.items?.length) {
   log('motore-immagini', findImages($c, chHtml, page.url()));
   log('motore-pagine', findReaderPages(load(chHtml), page.url()).slice(0, 10));
   log('motore-next', findNextLink(load(chHtml), page.url()));
+  log('immagini-scaricate-dal-browser', imgResponses.filter((u) => !/favicon|ads|doubleclick|google/.test(u)).slice(-40));
+  log('script-inline-con-immagini', load(chHtml)('script:not([src])').map((i, el) => load(chHtml)(el).html()).get().filter((c) => /\.(jpe?g|png|webp)/i.test(c)).map((c) => c.slice(0, 1500)));
+  const pages = findReaderPages(load(chHtml), page.url());
+  const nx = findNextLink(load(chHtml), page.url());
+  const p2 = pages.find((p) => p.n === 2)?.url || nx;
+  if (p2) { const h2 = await visit(p2, 'pw-capitolo-p2'); log('motore-immagini-p2', findImages(load(h2), h2, page.url())); }
   log('img-campione', $c('img').slice(0, 40).map((i, el) => Object.fromEntries(Object.entries(el.attribs))).get());
   log('select-campione', $c('select').map((i, el) => $c(el).find('option').slice(0, 5).map((j, o) => `${$c(o).attr('value')} | ${$c(o).text()}`).get()).get());
   // fetch nativo del capitolo e di un'immagine, con i cookie del browser
