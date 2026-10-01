@@ -76,7 +76,10 @@ export async function api(path, opts = {}) {
     const b = Books.get(m[1]);
     if (!b) fail(404, 'Libro non trovato');
     const action = m[2];
-    if (!action && method === 'GET') return { ...b, busy: isBusy(b.id), queued: queuedIds(b.id), chapters: Chapters.list(b.id) };
+    if (!action && method === 'GET') {
+      if (q.get('lite')) return { ...b, busy: isBusy(b.id), queued: queuedIds(b.id) };
+      return { ...b, busy: isBusy(b.id), queued: queuedIds(b.id), chapters: Chapters.list(b.id) };
+    }
     if (!action && method === 'PATCH') {
       const { title, update_hours, use_ai, render_js, rules } = body;
       return Books.update(b.id, { title, update_hours, use_ai, render_js, rules });
@@ -102,6 +105,7 @@ export async function api(path, opts = {}) {
   if ((m = p.match(/^\/chapters\/(\d+)$/))) {
     let ch = Chapters.get(m[1]);
     if (!ch) fail(404, 'Capitolo non trovato');
+    if (q.get('peek')) { const { content, ...rest } = ch; return rest; }
     // precaricamento: non apriamo il browser interno mentre l'utente sta leggendo
     if (q.get('prefetch') && ch.status !== 'ready' && needsBrowser(ch.url)) return { skipped: true };
     if (ch.status !== 'ready' || q.get('refresh')) {

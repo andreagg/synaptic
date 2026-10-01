@@ -217,179 +217,284 @@ $view.addEventListener('input', (e) => {
 });
 
 // ---------------------------------------------------------------- lettore
+const chapterState = (c) => {
+  if (!c) return '';
+  if (c.meta?.offline) return `📥 Già scaricato${c.meta.pages ? ` · ${c.meta.pages} pagine` : ''}: si apre subito`;
+  if (c.status === 'ready') return `🌐 Pagine già trovate${c.meta?.pages ? ` (${c.meta.pages})` : ''}: verranno scaricate ora`;
+  return '⬇ Non ancora scaricato: verrà analizzato e scaricato ora (serve connessione)';
+};
+
 async function renderReader(id) {
   clearInterval(timer);
   document.body.classList.add('reading');
-  $view.innerHTML = '<div class="empty"><div class="spinner" style="margin:auto;width:32px;height:32px"></div><p>Preparo il capitolo…</p></div>';
+  // schermata di caricamento con quello che sta succedendo
+  const peek = await api(`/chapters/${id}?peek=1`).catch(() => null);
+  const ready = peek?.status === 'ready';
+  $view.innerHTML = `<div class="loader-screen">
+      <div class="spinner big"></div>
+      <h3>${esc(peek?.title || 'Capitolo')}</h3>
+      <p id="ldmsg" class="muted">${ready ? 'Apro il capitolo…' : 'Analizzo il capitolo e cerco le pagine…'}</p>
+      ${ready ? '' : '<p class="muted small">Alla prima apertura il sito può chiedere una verifica: si apre il browser interno per qualche secondo.</p>'}
+      ${peek ? `<a class="btn" href="#/book/${peek.book_id}">Annulla</a>` : ''}
+    </div>`;
+  let watching = true;
+  if (peek && !ready) {
+    (async () => {
+      while (watching) {
+        await new Promise((r) => setTimeout(r, 600));
+        const b = await api(`/books/${peek.book_id}?lite=1`).catch(() => null);
+        const el = document.getElementById('ldmsg');
+        if (!watching || !el) break;
+        if (b?.message) el.textContent = b.message;
+      }
+    })();
+  }
   let ch;
   try { ch = await api(`/chapters/${id}`); } catch (e) {
+    watching = false;
     $view.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p>
       <div class="row" style="justify-content:center">
+      <button class="btn primary" onclick="location.reload()">Riprova</button>
       ${e.data?.chapter ? `<a class="btn" href="#/book/${e.data.chapter.book_id}">← Torna al libro</a>
       <a class="btn" href="${esc(e.data.chapter.url)}" target="_blank">Apri sul sito</a>` : '<a class="btn" href="#/">← Libreria</a>'}</div></div>`;
     return;
   }
+  watching = false;
+  if (location.hash !== `#/read/${id}`) return; // l'utente è andato altrove nel frattempo
+
   const bar = `<div class="reader-bar" id="rbar">
       <a class="btn" href="#/book/${ch.book.id}">←</a>
       <div class="title"><div class="muted" style="font-size:11px">${esc(ch.book.title)}</div><span id="rtitle">${esc(ch.title)}</span></div>
-      <a class="btn" id="rprev" href="${ch.prev ? `#/read/${ch.prev.id}` : '#'}" title="Precedente" ${ch.prev ? '' : 'hidden'}>‹</a>
-      <a class="btn" id="rnext" href="${ch.next ? `#/read/${ch.next.id}` : '#'}" title="Successivo" ${ch.next ? '' : 'hidden'}>›</a>
-    </div><div class="progress" id="prog"></div>`;
-  const nav = `<div class="reader-nav">
-      ${ch.prev ? `<a class="btn" href="#/read/${ch.prev.id}">‹ ${esc(ch.prev.title)}</a>` : ''}
-      ${ch.next ? `<a class="btn primary" href="#/read/${ch.next.id}">${esc(ch.next.title)} ›</a>` : `<a class="btn" href="#/book/${ch.book.id}">Fine · torna al libro</a>`}
+      <span class="pgnum" id="pgnum"></span>
+      ${ch.type === 'images' ? '<button class="btn" id="zoombtn" title="Zoom">🔍</button>' : ''}
+    </div><div class="progress" id="prog"></div><div class="loadpill" id="loadpill" hidden></div>`;
+  const end = `<div class="chapter-end">
+      <p class="muted">Fine di <b>${esc(ch.title)}</b></p>
+      ${ch.next ? `<a class="btn primary big" href="#/read/${ch.next.id}">Capitolo successivo ›<br><small>${esc(ch.next.title)}</small></a>
+        <p class="muted small">${chapterState(ch.next)}</p>` : `<a class="btn" href="#/book/${ch.book.id}">Fine · torna al libro</a>`}
+      <div class="row" style="justify-content:center">
+        ${ch.prev ? `<a class="btn" href="#/read/${ch.prev.id}">‹ Precedente</a>` : ''}
+        <a class="btn" href="#/book/${ch.book.id}">Elenco capitoli</a>
+      </div>
     </div>`;
   const ref = ch.content?.referer || ch.url;
+
   if (ch.type === 'images') {
-    $view.innerHTML = bar + '<div class="pages" id="pages"></div><div class="reader-nav" id="tail"></div>';
-    continuousReader(ch);
-    return;
+    const imgs = ch.content.images;
+    $view.innerHTML = bar + `<div class="pages" id="pages">${imgs.map((u, i) =>
+      `<div class="pg" data-i="${i}"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.parentNode.classList.add('ok')"></div>`).join('')}</div>` + end;
+    // il capitolo aperto viene salvato offline (tutte le pagine)
+    if (!ch.meta?.offline) api(`/books/${ch.book.id}/download`, { method: 'POST', body: { chapters: [ch.id] } }).catch(() => {});
+    hydrate();
+    trackLoading(imgs.length);
+    setupImageReader(ch);
   } else if (ch.type === 'pdf') {
     if (backend.renderPdf) {
-      $view.innerHTML = bar + '<div class="pages" id="pdfpages"><p class="muted" style="text-align:center">Apro il PDF…</p></div>' + nav;
+      $view.innerHTML = bar + '<div class="pages" id="pdfpages"><p class="muted" style="text-align:center">Apro il PDF…</p></div>' + end;
       backend.renderPdf(document.getElementById('pdfpages'), ch.content.url, ref).catch((e) => {
         document.getElementById('pdfpages').innerHTML = `<p class="empty">⚠️ ${esc(e.message)}</p>`;
       });
     } else {
       $view.innerHTML = bar + `<iframe class="pdf" src="${await backend.mediaUrl(ch.content.url, ref)}"></iframe>`;
     }
+    setupScroll(ch);
   } else if (ch.type === 'html') {
-    $view.innerHTML = bar + `<article class="article">${ch.content.html}</article>` + nav;
+    $view.innerHTML = bar + `<article class="article">${ch.content.html}</article>` + end;
     $view.querySelectorAll('.article img').forEach((img) => {
       try { img.dataset.m = new URL(img.getAttribute('src'), ch.url).href; img.dataset.ref = ch.url; img.removeAttribute('src'); } catch { /* ignore */ }
     });
+    hydrate();
+    setupScroll(ch);
   } else {
     $view.innerHTML = bar + `<div class="empty"><div class="big">📦</div><p>File scaricabile</p>
-      <a class="btn primary" href="${await backend.mediaUrl(ch.content.url, ref)}" download>Scarica</a></div>`;
+      <a class="btn primary" href="${await backend.mediaUrl(ch.content.url, ref)}" download>Scarica</a></div>` + end;
   }
-  hydrate();
-  // barra che si nasconde leggendo, avanzamento e salvataggio progresso
-  let lastY = 0; let saved = 0;
+}
+
+/** Mostra "Pagine caricate 5/18" finché tutte le immagini non sono arrivate. */
+function trackLoading(total) {
+  const pill = document.getElementById('loadpill');
+  const update = () => {
+    if (!pill.isConnected) return;
+    const ok = document.querySelectorAll('.pages .pg.ok').length;
+    const failed = document.querySelectorAll('.pages .img-fail').length;
+    if (ok + failed >= total) { pill.hidden = true; return; }
+    pill.hidden = false;
+    pill.innerHTML = `<span class="spinner"></span> Pagine caricate ${ok}/${total}`;
+    setTimeout(update, 400);
+  };
+  update();
+}
+
+function setupScroll(ch) {
   const rbar = document.getElementById('rbar'); const prog = document.getElementById('prog');
-  const key = `pos:${id}`;
-  try { const y = Number(localStorage.getItem(key)); if (y > 0 && ch.type !== 'pdf') setTimeout(() => scrollTo(0, y), 50); } catch { /* storage non disponibile */ }
-  api(`/chapters/${id}/progress`, { method: 'POST', body: { progress: 0 } }).catch(() => {});
+  const key = `pos:${ch.id}`;
+  try { const y = Number(localStorage.getItem(key)); if (y > 0) setTimeout(() => scrollTo(0, y), 300); } catch { /* storage non disponibile */ }
+  api(`/chapters/${ch.id}/progress`, { method: 'POST', body: { progress: 0 } }).catch(() => {});
+  let lastY = 0; let saved = 0;
+  const pgEl = document.getElementById('pgnum');
+  const pages = [...document.querySelectorAll('.pages .pg')];
   window.onscroll = () => {
     const y = scrollY; const max = document.documentElement.scrollHeight - innerHeight;
     rbar?.classList.toggle('hide', y > lastY && y > 80); lastY = y;
     const p = max > 0 ? Math.min(1, y / max) : 1;
     if (prog) prog.style.width = (p * 100) + '%';
+    if (pages.length && pgEl) {
+      const probe = innerHeight * 0.3; let pg = 1;
+      for (let i = 0; i < pages.length; i++) if (pages[i].getBoundingClientRect().top <= probe) pg = i + 1;
+      pgEl.textContent = `${pg}/${pages.length}`;
+    }
     try { localStorage.setItem(key, String(y)); } catch { /* ignore */ }
-    if (Date.now() - saved > 4000) { saved = Date.now(); api(`/chapters/${id}/progress`, { method: 'POST', body: { progress: p } }).catch(() => {}); }
+    if (Date.now() - saved > 4000) { saved = Date.now(); api(`/chapters/${ch.id}/progress`, { method: 'POST', body: { progress: p } }).catch(() => {}); }
   };
-  $view.onclick = (e) => { if (e.target.tagName === 'IMG') rbar?.classList.toggle('hide'); };
+  window.onscroll();
   document.onkeydown = (e) => {
-    if (!document.body.classList.contains('reading')) return;
+    if (!document.body.classList.contains('reading') || document.querySelector('.zoom')) return;
     if (e.key === 'ArrowRight' && ch.next) location.hash = `#/read/${ch.next.id}`;
     if (e.key === 'ArrowLeft' && ch.prev) location.hash = `#/read/${ch.prev.id}`;
   };
-  // pre-carica il capitolo successivo sul server
-  if (ch.next) setTimeout(() => api(`/chapters/${ch.next.id}?prefetch=1`).catch(() => {}), 1500);
+}
+
+/** Lettore a immagini: scorrimento, tocco singolo = barra, doppio tocco o pizzico = zoom. */
+function setupImageReader(ch) {
+  setupScroll(ch);
+  const rbar = document.getElementById('rbar');
+  const pagesEl = document.getElementById('pages');
+  const srcOf = () => [...pagesEl.querySelectorAll('.pg img')].map((i) => i.currentSrc || i.src);
+  let lastTap = 0; let tapTimer = null;
+  pagesEl.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const pg = e.target.closest('.pg'); if (!pg) return;
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      clearTimeout(tapTimer); lastTap = 0;
+      openZoom(srcOf(), Number(pg.dataset.i), { scale: 2.5, x: e.clientX, y: e.clientY });
+    } else {
+      lastTap = now;
+      tapTimer = setTimeout(() => rbar?.classList.toggle('hide'), 300);
+    }
+  });
+  // pizzico con due dita sulla pagina: apre il visore
+  const touches = new Map();
+  pagesEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    touches.set(e.pointerId, e);
+    if (touches.size === 2) {
+      const pg = e.target.closest('.pg');
+      touches.clear();
+      if (pg) openZoom(srcOf(), Number(pg.dataset.i), { scale: 1.8, x: e.clientX, y: e.clientY });
+    }
+  });
+  const clear = (e) => touches.delete(e.pointerId);
+  pagesEl.addEventListener('pointerup', clear); pagesEl.addEventListener('pointercancel', clear);
+  document.getElementById('zoombtn').onclick = () => {
+    const probe = innerHeight * 0.3; let idx = 0;
+    pagesEl.querySelectorAll('.pg').forEach((p, i) => { if (p.getBoundingClientRect().top <= probe) idx = i; });
+    openZoom(srcOf(), idx, { scale: 1 });
+  };
 }
 
 /**
- * Lettura continua dei fumetti: i capitoli si susseguono uno sotto l'altro.
- * Arrivati in fondo si carica il successivo; titolo, indirizzo e progresso seguono lo scorrimento.
+ * Visore con zoom: pizzico per ingrandire, trascina per spostarti, doppio tocco per
+ * ingrandire/ridurre, scorri a destra/sinistra (a zoom 1) per cambiare pagina.
  */
-function continuousReader(first) {
-  const pagesEl = document.getElementById('pages');
-  const tail = document.getElementById('tail');
-  const rbar = document.getElementById('rbar'); const prog = document.getElementById('prog');
-  const titleEl = document.getElementById('rtitle');
-  const pgEl = document.createElement('span');
-  pgEl.className = 'pgnum'; pgEl.textContent = `1/${first.content.images.length}`;
-  document.getElementById('rprev').before(pgEl);
-  const loaded = [];
-  let last = first; let current = first; let loading = false;
-
-  // le immagini si scaricano solo quando si avvicinano allo schermo
-  const lazy = new IntersectionObserver((entries) => entries.forEach((e) => {
-    if (e.isIntersecting) { lazy.unobserve(e.target); hydrate(e.target.parentNode); }
-  }), { rootMargin: '2500px 0px' });
-
-  const append = (c) => {
-    const sec = document.createElement('section');
-    sec.className = 'chap'; sec.dataset.id = c.id;
-    const ref = c.content.referer || c.url;
-    sec.innerHTML = `<div class="chap-head">${esc(c.title)}</div>` + c.content.images.map((u, i) =>
-      `<div class="pg"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.parentNode.classList.add('ok')"></div>`).join('');
-    pagesEl.appendChild(sec);
-    sec.querySelectorAll('img[data-m]').forEach((img) => lazy.observe(img));
-    loaded.push({ ch: c, el: sec, imgs: [...sec.querySelectorAll('.pg')] });
-    // download "live": il capitolo successivo si scarica in background mentre leggi
-    if (c.next) api(`/books/${first.book.id}/download`, { method: 'POST', body: { chapters: [c.next.id], prefetch: true } }).catch(() => {});
+function openZoom(srcs, index, start = {}) {
+  document.querySelector('.zoom')?.remove();
+  const ov = document.createElement('div');
+  ov.className = 'zoom';
+  ov.innerHTML = `<div class="zoom-stage"><img alt=""></div>
+    <div class="zoom-bar"><button class="btn" data-z="prev">‹</button><span class="zoom-n"></span>
+    <button class="btn" data-z="next">›</button><button class="btn" data-z="fit">1:1</button><button class="btn" data-z="close">✕</button></div>`;
+  document.body.appendChild(ov);
+  const stage = ov.querySelector('.zoom-stage'); const img = ov.querySelector('img'); const num = ov.querySelector('.zoom-n');
+  let s = 1; let x = 0; let y = 0; let base = { w: 0, h: 0 };
+  const clampPos = () => {
+    const W = stage.clientWidth; const H = stage.clientHeight;
+    const w = base.w * s; const h = base.h * s;
+    x = w <= W ? (W - w) / 2 : Math.min(0, Math.max(W - w, x));
+    y = h <= H ? (H - h) / 2 : Math.min(0, Math.max(H - h, y));
   };
-
-  const loadNext = async () => {
-    if (loading) return;
-    if (!last.next) { tail.innerHTML = `<a class="btn" href="#/book/${first.book.id}">Fine · torna al libro</a>`; return; }
-    loading = true;
-    tail.innerHTML = `<span class="spinner"></span>&nbsp;<span class="muted">Carico ${esc(last.next.title)}…</span>`;
-    try {
-      const c = await api(`/chapters/${last.next.id}`);
-      if (c.type === 'images' && c.content?.images?.length) {
-        append(c); last = c; tail.innerHTML = '';
-      } else {
-        tail.innerHTML = `<a class="btn primary" href="#/read/${c.id}">${esc(c.title)} ›</a>`;
-        last = { next: null, noMore: true };
+  const apply = (anim) => {
+    clampPos();
+    img.style.transition = anim ? 'transform .18s ease-out' : 'none';
+    img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+  };
+  const zoomAt = (ns, px, py, anim) => {
+    ns = Math.max(1, Math.min(6, ns));
+    const r = stage.getBoundingClientRect(); px -= r.left; py -= r.top;
+    x = px - (px - x) * (ns / s); y = py - (py - y) * (ns / s); s = ns;
+    apply(anim);
+  };
+  const show = (i, initial) => {
+    index = Math.max(0, Math.min(srcs.length - 1, i));
+    num.textContent = `${index + 1}/${srcs.length}`;
+    img.onload = () => {
+      const W = stage.clientWidth; const H = stage.clientHeight;
+      const k = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+      base = { w: img.naturalWidth * k, h: img.naturalHeight * k };
+      img.style.width = base.w + 'px'; img.style.height = base.h + 'px';
+      s = 1; x = 0; y = 0; apply(false);
+      if (initial?.scale > 1) zoomAt(initial.scale, initial.x ?? W / 2, initial.y ?? H / 2, true);
+    };
+    img.src = srcs[index];
+  };
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') show(index + 1); if (e.key === 'ArrowLeft') show(index - 1); };
+  document.addEventListener('keydown', onKey);
+  ov.querySelector('.zoom-bar').onclick = (e) => {
+    const z = e.target.closest('[data-z]')?.dataset.z;
+    if (z === 'close') close();
+    if (z === 'prev') show(index - 1);
+    if (z === 'next') show(index + 1);
+    if (z === 'fit') { s = 1; apply(true); }
+  };
+  // gesti
+  const pts = new Map(); let pinch = null; let pan = null; let lastTap = 0; let swipe = null;
+  stage.addEventListener('pointerdown', (e) => {
+    stage.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s }; pan = null; swipe = null;
+    } else if (pts.size === 1) {
+      pan = { x: e.clientX, y: e.clientY, ox: x, oy: y }; swipe = { x: e.clientX, y: e.clientY, t: Date.now() };
+    }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      zoomAt(pinch.s * (d / pinch.d), (a.x + b.x) / 2, (a.y + b.y) / 2, false);
+    } else if (pan && s > 1) {
+      x = pan.ox + (e.clientX - pan.x); y = pan.oy + (e.clientY - pan.y); apply(false);
+    }
+  });
+  const up = (e) => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 0) {
+      if (swipe && s <= 1.01) {
+        const dx = e.clientX - swipe.x; const dy = e.clientY - swipe.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(index + (dx < 0 ? 1 : -1));
       }
-    } catch (e) {
-      tail.innerHTML = `<p class="muted">⚠️ ${esc(e.message)}</p><button class="btn" id="retry">Riprova</button>`;
-      document.getElementById('retry').onclick = () => loadNext();
-      loading = false;
-      return;
+      const moved = swipe && Math.hypot(e.clientX - swipe.x, e.clientY - swipe.y) > 10;
+      if (!moved) {
+        const now = Date.now();
+        if (now - lastTap < 300) { zoomAt(s > 1.2 ? 1 : 2.5, e.clientX, e.clientY, true); lastTap = 0; } else lastTap = now;
+      }
+      pan = null; swipe = null;
     }
-    loading = false;
-    if (!last.noMore) { tailObs.unobserve(tail); tailObs.observe(tail); } // ricontrolla se serve un altro capitolo
   };
-  const tailObs = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadNext(); }, { rootMargin: '1200px 0px' });
-
-  append(first);
-  tailObs.observe(tail);
-  // riprende dal punto in cui si era rimasti nel capitolo
-  try {
-    const off = Number(localStorage.getItem(`pos:${first.id}`));
-    if (off > 0) setTimeout(() => scrollTo(0, loaded[0].el.offsetTop + off), 400);
-  } catch { /* storage non disponibile */ }
-  api(`/chapters/${first.id}/progress`, { method: 'POST', body: { progress: 0 } }).catch(() => {});
-
-  let lastY = 0; let saved = 0;
-  window.onscroll = () => {
-    const y = scrollY;
-    rbar?.classList.toggle('hide', y > lastY && y > 80); lastY = y;
-    const probe = innerHeight * 0.3;
-    let cur = loaded[0];
-    for (const l of loaded) if (l.el.getBoundingClientRect().top <= probe) cur = l;
-    const r = cur.el.getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, (probe - r.top) / Math.max(1, r.height - innerHeight * 0.7)));
-    if (prog) prog.style.width = (p * 100) + '%';
-    let pg = 0;
-    for (let i = 0; i < cur.imgs.length; i++) if (cur.imgs[i].getBoundingClientRect().top <= probe) pg = i + 1;
-    pgEl.textContent = `${Math.max(1, pg)}/${cur.imgs.length}`;
-    if (cur.ch.id !== current.id) {
-      api(`/chapters/${current.id}/progress`, { method: 'POST', body: { progress: 1 } }).catch(() => {});
-      current = cur.ch;
-      titleEl.textContent = current.title;
-      history.replaceState(null, '', `#/read/${current.id}`);
-      const prev = document.getElementById('rprev'); const next = document.getElementById('rnext');
-      prev.hidden = !current.prev; if (current.prev) prev.href = `#/read/${current.prev.id}`;
-      next.hidden = !current.next; if (current.next) next.href = `#/read/${current.next.id}`;
-      saved = 0;
-    }
-    try { localStorage.setItem(`pos:${current.id}`, String(Math.max(0, -r.top))); } catch { /* ignore */ }
-    if (Date.now() - saved > 4000) { saved = Date.now(); api(`/chapters/${current.id}/progress`, { method: 'POST', body: { progress: p } }).catch(() => {}); }
-  };
-  $view.onclick = (e) => { if (e.target.tagName === 'IMG') rbar?.classList.toggle('hide'); };
-  document.onkeydown = (e) => {
-    if (!document.body.classList.contains('reading')) return;
-    if (e.key === 'ArrowRight' && current.next) location.hash = `#/read/${current.next.id}`;
-    if (e.key === 'ArrowLeft' && current.prev) location.hash = `#/read/${current.prev.id}`;
-  };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  stage.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(s * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY, false); }, { passive: false });
+  show(index, start);
 }
 
 // ---------------------------------------------------------------- router
 async function route() {
-  window.onscroll = null; $view.onclick = null; lastHtml = '';
+  window.onscroll = null; $view.onclick = null; lastHtml = ''; document.querySelector('.zoom')?.remove();
   if (!location.hash.startsWith('#/book/')) { selecting = false; selected.clear(); }
   const h = location.hash || '#/';
   let m;

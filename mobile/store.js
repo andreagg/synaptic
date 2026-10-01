@@ -94,7 +94,7 @@ export const Chapters = {
   neighbours(ch) {
     const list = chaptersOf(ch.book_id).sort(bySort);
     const i = list.findIndex((c) => c.id === ch.id);
-    const pick = (c) => (c ? { id: c.id, title: c.title } : null);
+    const pick = (c) => (c ? { id: c.id, title: c.title, status: c.status, meta: copy(c.meta) ?? null } : null);
     return { prev: pick(list[i - 1]), next: pick(list[i + 1]) };
   },
   remove(cid) { state.chapters = state.chapters.filter((c) => c.id !== Number(cid)); persist(); },

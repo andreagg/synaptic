@@ -138,11 +138,12 @@ export const Chapters = {
     db.prepare(`UPDATE chapters SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...vals, id);
   },
   neighbours(ch) {
-    const prev = db.prepare(`SELECT id, title FROM chapters WHERE book_id = ? AND (sort_key < ? OR (sort_key = ? AND id < ?))
+    const prev = db.prepare(`SELECT id, title, status, meta FROM chapters WHERE book_id = ? AND (sort_key < ? OR (sort_key = ? AND id < ?))
       ORDER BY sort_key DESC, id DESC LIMIT 1`).get(ch.book_id, ch.sort_key, ch.sort_key, ch.id);
-    const next = db.prepare(`SELECT id, title FROM chapters WHERE book_id = ? AND (sort_key > ? OR (sort_key = ? AND id > ?))
+    const next = db.prepare(`SELECT id, title, status, meta FROM chapters WHERE book_id = ? AND (sort_key > ? OR (sort_key = ? AND id > ?))
       ORDER BY sort_key, id LIMIT 1`).get(ch.book_id, ch.sort_key, ch.sort_key, ch.id);
-    return { prev: prev || null, next: next || null };
+    const h = (c) => (c ? { ...c, meta: parse(c.meta) } : null);
+    return { prev: h(prev), next: h(next) };
   },
   remove(id) { db.prepare('DELETE FROM chapters WHERE id = ?').run(id); },
   clearNew(bookId) { db.prepare('UPDATE chapters SET is_new = 0 WHERE book_id = ?').run(bookId); },

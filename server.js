@@ -32,6 +32,7 @@ app.post('/api/books', wrap(async (req, res) => {
 
 app.get('/api/books/:id', (req, res) => {
   const b = bookOr404(req, res); if (!b) return;
+  if (req.query.lite) return res.json({ ...b, busy: isBusy(b.id), queued: queuedIds(b.id) });
   res.json({ ...b, busy: isBusy(b.id), queued: queuedIds(b.id), chapters: Chapters.list(b.id) });
 });
 
@@ -68,6 +69,7 @@ app.post('/api/books/:id/seen', (req, res) => {
 app.get('/api/chapters/:id', wrap(async (req, res) => {
   let ch = Chapters.get(Number(req.params.id));
   if (!ch) return res.status(404).json({ error: 'Capitolo non trovato' });
+  if (req.query.peek) { const { content, ...rest } = ch; return res.json(rest); }
   if (ch.status !== 'ready' || req.query.refresh) {
     try { ch = await resolveChapterNow(ch.id, { force: !!req.query.refresh }); }
     catch (e) { return res.status(422).json({ error: e.message, chapter: Chapters.get(ch.id) }); }
