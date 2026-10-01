@@ -177,7 +177,7 @@ async function renderReader(id) {
     if (e.key === 'ArrowLeft' && ch.prev) location.hash = `#/read/${ch.prev.id}`;
   };
   // pre-carica il capitolo successivo sul server
-  if (ch.next) setTimeout(() => api(`/chapters/${ch.next.id}`).catch(() => {}), 1500);
+  if (ch.next) setTimeout(() => api(`/chapters/${ch.next.id}?prefetch=1`).catch(() => {}), 1500);
 }
 
 // ---------------------------------------------------------------- router
@@ -193,6 +193,23 @@ async function route() {
     if (!h.startsWith('#/read')) scrollTo(0, 0);
   } catch (e) { $view.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p></div>`; }
 }
+// ---------------------------------------------------------------- aggiunta fonte
+const dlg = document.getElementById('addDialog');
+document.getElementById('addBtn').onclick = () => dlg.showModal();
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  if (e.submitter?.value !== 'ok') return;
+  const f = new FormData(e.target);
+  try {
+    const b = await api('/books', { method: 'POST', body: {
+      url: f.get('url'), title: f.get('title') || undefined, update_hours: Number(f.get('update_hours')),
+      use_ai: f.get('use_ai') === 'on', render_js: f.get('render_js') === 'on',
+    } });
+    e.target.reset();
+    toast('Fonte aggiunta: analisi in corso…');
+    location.hash = `#/book/${b.id}`;
+  } catch (err) { toast(err.message); }
+});
+
 addEventListener('hashchange', route);
 await backend.init();
 window.addEventListener('synaptic:changed', () => { if (!/^#\/(read|settings)/.test(location.hash)) route(); });

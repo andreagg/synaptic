@@ -3,6 +3,7 @@
 // e il risultato del motore. Uso: node test/probe.mjs <url>
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { probeUrl } from '../src/fetcher.js';
 import { load, findChapterList, findImages, findReaderPages, findNextLink, findFiles } from '../src/engine/analyze.js';
 
 const url = process.argv[2] || 'https://onepiecepower.com/manga8/onepiece/volumi/lista-capitoli';
@@ -86,7 +87,11 @@ if (list?.items?.length) {
   const img = findImages($c, chHtml, page.url()).images[0];
   if (img) {
     const ri = await fetch(img, { headers: { 'user-agent': UA, referer: ch.url } }).catch((e) => ({ status: 'ERR ' + e.message }));
-    log('fetch-immagine', { img, status: ri.status, type: ri.headers?.get?.('content-type') });
+    log('fetch-immagine-senza-cookie', { img, status: ri.status, type: ri.headers?.get?.('content-type') });
+    const base = img.replace(/\d+\.jpg$/, '');
+    const res = {};
+    for (const n of ['01', '02', '10', '18', '19', '20', '25', '40']) res[n] = await probeUrl(base + n + '.jpg', ch.url);
+    log('probe-sequenza', res);
   }
 }
 await browser.close();

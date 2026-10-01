@@ -90,6 +90,7 @@ export async function fetchPage(url, { referer, render = false } = {}) {
   // protezione anti-bot: apriamo la pagina in un browser vero (cookie condivisi con le richieste native)
   if (native && ([403, 503, 429].includes(res.status) || isChallenge(html))) {
     console.log(`[verifica] ${url} protetto (HTTP ${res.status}): apro il browser interno`);
+    browserHosts.add(new URL(url).host);
     return fetchViaWebView(url, { visible: true });
   }
   if (res.status >= 400) throw new Error(`HTTP ${res.status} su ${url}`);
@@ -97,12 +98,16 @@ export async function fetchPage(url, { referer, render = false } = {}) {
   return { url: res.url, html, contentType: res.type || 'text/html' };
 }
 
+// host che richiedono il browser interno (per non aprirlo durante i precaricamenti)
+const browserHosts = new Set();
+export const needsBrowser = (url) => { try { return browserHosts.has(new URL(url).host); } catch { return false; } };
+
 // --- browser interno: supera le verifiche anti-bot e i siti che generano tutto in JavaScript ---
 let webviewLock = Promise.resolve();
 export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
   const run = () => new Promise((resolve, reject) => {
     const handles = [];
-    let done = false; let poll = null; let timer = null;
+    let done = false; let poll = null; let timer = null; let lastLen = -1;
     const finish = async (err, value) => {
       if (done) return;
       done = true;
@@ -118,7 +123,11 @@ export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
         if (!d.synHtml) return;
         const blocked = isChallenge(d.synHtml);
         console.log(`[browser] ${d.url} ${d.synHtml.length} byte, ${blocked ? 'ancora in verifica' : d.synReady ? 'pronta' : 'in caricamento'}`);
-        if (!blocked && d.synReady) finish(null, { url: d.url || url, html: d.synHtml, contentType: 'text/html' });
+        // aspettiamo due letture uguali a pagina pronta: gli script del sito hanno finito di riempirla
+        if (!blocked && d.synReady) {
+          if (lastLen === d.synHtml.length) finish(null, { url: d.url || url, html: d.synHtml, contentType: 'text/html' });
+          lastLen = d.synHtml.length;
+        } else lastLen = -1;
       }));
       handles.push(await InAppBrowser.addListener('closeEvent', () => finish(new Error('Verifica del sito annullata: riprova con "Cerca aggiornamenti"'))));
       await InAppBrowser.openWebView({
@@ -171,4 +180,20 @@ export async function mediaObjectUrl(url, referer) {
   const o = URL.createObjectURL(blob);
   objectUrls.set(url, o);
   return o;
+}
+
+/** Verifica se un'immagine esiste (per le pagine numerate in sequenza). */
+export async function probeUrl(url, referer) {
+  return withHostSlot(url, async () => {
+    try {
+      if (native) {
+        const r = await CapacitorHttp.request({ url, method: 'HEAD', headers: { ...IMG_HEADERS, ...(referer ? { Referer: referer } : {}) }, connectTimeout: 20000, readTimeout: 20000 });
+        const type = lower(r.headers)['content-type'] || '';
+        console.log(`[http] ${r.status} prova ${url}`);
+        return r.status >= 200 && r.status < 300 && !/text\/html/i.test(type);
+      }
+      const r = await fetch(url, { method: 'HEAD' });
+      return r.ok && !/text\/html/i.test(r.headers.get('content-type') || '');
+    } catch { return false; }
+  });
 }

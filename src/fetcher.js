@@ -140,3 +140,20 @@ function guessType(url) {
     '.gif': 'image/gif', '.avif': 'image/avif', '.pdf': 'application/pdf', '.epub': 'application/epub+zip',
     '.cbz': 'application/vnd.comicbook+zip', '.zip': 'application/zip' })[ext] || 'application/octet-stream';
 }
+
+/** Verifica se un'immagine esiste (HEAD, con ripiego su GET parziale). */
+export async function probeUrl(url, referer) {
+  for (const method of ['HEAD', 'GET']) {
+    try {
+      const res = await withHostSlot(url, () => fetch(url, {
+        method, redirect: 'follow', signal: AbortSignal.timeout(20000),
+        headers: { 'user-agent': UA, accept: 'image/*,*/*;q=0.8', ...(referer ? { referer } : {}), ...(method === 'GET' ? { range: 'bytes=0-0' } : {}) },
+      }));
+      res.body?.cancel().catch(() => {});
+      if (res.status === 405 || res.status === 501) continue;
+      const type = res.headers.get('content-type') || '';
+      return res.ok && !/text\/html/i.test(type);
+    } catch { /* riprova con GET */ }
+  }
+  return false;
+}

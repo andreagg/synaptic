@@ -7,7 +7,7 @@ import * as cheerio from 'cheerio';
 export const FILE_EXT = /\.(pdf|cbz|cbr|epub|mobi|zip|djvu)(\?|#|$)/i;
 const IMG_EXT = /\.(jpe?g|png|webp|gif|avif|bmp)(\?|#|$)/i;
 const ASSET_EXT = /\.(css|js|json|xml|rss|ico|svg|woff2?|ttf|mp3|mp4|webm)(\?|#|$)/i;
-const JUNK_IMG = /(logo|icon|avatar|banner|sprite|emoji|smiley|button|badge|loader|loading|spinner|placeholder|pixel|blank|spacer|ads?[\/_.-]|advert|facebook|twitter|whatsapp|telegram|gravatar|flag|rating|star)/i;
+const JUNK_IMG = /(arrow|freccia|sfondo|background|fullscreen|logo|icon|avatar|banner|sprite|emoji|smiley|button|badge|loader|loading|spinner|placeholder|pixel|blank|spacer|ads?[\/_.-]|advert|facebook|twitter|whatsapp|telegram|gravatar|flag|rating|star)/i;
 const CHAPTER_WORDS = /(cap(itolo|\.)?|chap(ter)?|ch\.|episod|ep\.|volum|vol\.|tomo|issue|numero|parte|part|#\s*\d)/i;
 const NEXT_WORDS = /^(next|successiv|avanti|seguente|prossim|›|»|>|→|>>|older)/i;
 const CHROME_SEL = 'header, footer, nav, aside, [role=navigation], .menu, .navbar, .sidebar, .footer, .header, #menu, #sidebar, #footer, #header, .breadcrumb, .comments, #comments';
@@ -260,15 +260,22 @@ export function findImages($, html, base, rules = {}) {
   const groups = [...groupBy(cands, (c) => signature(c.url, 'strict')).entries()]
     .map(([sig, g]) => ({ sig, g }))
     .concat([...groupBy(cands, (c) => signature(c.url, 'loose')).entries()].map(([sig, g]) => ({ sig, g, loose: true })));
-  groups.sort((a, b) => b.g.length - a.g.length || (a.loose ? 1 : -1));
+  // le pagine di un fumetto hanno quasi sempre nomi numerici (01.jpg, page_002.webp)
+  const numericRatio = (g) => g.filter((c) => isNumericName(c.url)).length / g.length;
+  groups.sort((a, b) => (numericRatio(b.g) >= 0.5) - (numericRatio(a.g) >= 0.5) || b.g.length - a.g.length || (a.loose ? 1 : -1));
   const best = groups[0];
-  if (best.g.length >= 2) {
+  if (best.g.length >= 2 && (numericRatio(best.g) >= 0.5 || !cands.some((c) => isNumericName(c.url)))) {
     const imgs = best.g.sort((a, b) => a.order - b.order).map((c) => c.url);
     return { images: imgs, confidence: Math.min(1, 0.4 + 0.1 * imgs.length), pattern: sigToRegex(best.sig) };
   }
   // una sola immagine grande: probabilmente un lettore "una pagina alla volta"
-  const main = cands.find((c) => IMG_EXT.test(c.url)) || cands[0];
+  const main = cands.find((c) => isNumericName(c.url)) || cands.find((c) => IMG_EXT.test(c.url)) || cands[0];
   return { images: [main.url], confidence: 0.3, single: true, pattern: sigToRegex(signature(main.url)) };
+}
+
+/** Nome file numerico tipo 01.jpg, 002.webp, page_03.png, p-4.jpg */
+export function isNumericName(url) {
+  try { return /^(?:p(?:age|ag|g)?[_-]?)?\d{1,4}[a-z]?\.(jpe?g|png|webp|avif|gif)$/i.test(decodeURIComponent(new URL(url).pathname.split('/').pop())); } catch { return false; }
 }
 
 /**

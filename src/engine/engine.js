@@ -1,9 +1,9 @@
 // Motore: orchestra scansione delle fonti, risoluzione dei capitoli, download offline.
 import { Books, Chapters } from '../db.js';
-import { fetchPage, getMedia, isCached } from '../fetcher.js';
+import { fetchPage, getMedia, isCached, probeUrl } from '../fetcher.js';
 import {
   load, pageMeta, findChapterList, findFiles, findImages, findReaderPages,
-  findNextLink, extractArticle, summarizeForAI, signature, FILE_EXT,
+  findNextLink, extractArticle, summarizeForAI, signature, FILE_EXT, isNumericName,
 } from './analyze.js';
 import { analyzeWithAI, aiAvailable } from './ai.js';
 
@@ -225,6 +225,11 @@ async function extractChapter(book, ch) {
   if (files.length > 1) return { expand: files.map((f) => ({ ...fileChapter(f, 0), sort_key: 0 })) };
 
   // c) lettore "una pagina alla volta"
+  if (imgs.single && isNumericName(imgs.images[0])) {
+    // pagine numerate in sequenza (01.jpg, 02.jpg…): le scopriamo provando i numeri successivi
+    const seq = await probeSequence(book, imgs.images[0], page.url);
+    if (seq.length >= 2) return { type: 'images', content: { images: seq, referer: page.url } };
+  }
   if (imgs.single) {
     const multi = await crawlReader(book, page, $, imgs);
     if (multi.length >= 2) return { type: 'images', content: { images: multi, referer: page.url } };
@@ -305,6 +310,36 @@ async function crawlReader(book, page, $, first, aiNext = '') {
     Books.update(book.id, { message: `Pagine del capitolo: ${[...byPage.values()].filter(Boolean).length}` });
   }
   return [...byPage.values()].filter(Boolean).sort((a, b) => a.n - b.n).map((p) => p.img);
+}
+
+/**
+ * Dato l'URL di una pagina con nome numerico (…/009/01.jpg), trova le altre pagine
+ * provando i numeri vicini (con lo stesso numero di cifre) finché non esistono più.
+ */
+async function probeSequence(book, url, referer) {
+  const m = url.match(/^(.*\/(?:p(?:age|ag|g)?[_-]?)?)(\d+)([a-z]?\.\w+)(\?.*)?$/i);
+  if (!m) return [url];
+  const [, prefix, num, ext, query = ''] = m;
+  const make = (n) => `${prefix}${String(n).padStart(num.length, '0')}${ext}${query}`;
+  const start = parseInt(num, 10);
+  const found = new Map([[start, url]]);
+  // indietro (se la pagina trovata non è la prima)
+  for (let n = start - 1; n >= 0; n--) {
+    if (!(await probeUrl(make(n), referer))) break;
+    found.set(n, make(n));
+  }
+  // avanti, a gruppi di 4; ci fermiamo dopo 2 numeri mancanti consecutivi
+  let n = start + 1; let misses = 0;
+  while (misses < 2 && n < start + MAX_READER_PAGES) {
+    const batch = [n, n + 1, n + 2, n + 3];
+    const ok = await Promise.all(batch.map((k) => probeUrl(make(k), referer)));
+    for (let i = 0; i < batch.length; i++) {
+      if (ok[i]) { found.set(batch[i], make(batch[i])); misses = 0; } else if (++misses >= 2) break;
+    }
+    n += 4;
+    Books.update(book.id, { message: `Pagine trovate: ${found.size}` });
+  }
+  return [...found.entries()].sort((a, b) => a[0] - b[0]).map(([, u]) => u);
 }
 
 /** Numero di pagina: il numero che cambia tra l'URL del capitolo e quello della pagina. */

@@ -74,3 +74,15 @@ test('download offline mette in cache tutte le immagini', async () => {
   await engine.downloadBook(existing.id);
   assert.match(Books.get(existing.id).message, /offline: 6 file/);
 });
+
+test('lettore JS con pagine numerate (stile onepiecepower 2026): pagine trovate per tentativi', async () => {
+  const b = create('/op2/lista-capitoli');
+  await engine.scanBook(b.id);
+  const chs = Chapters.list(b.id);
+  assert.equal(chs.length, Object.values(VOLUMES).flat().length, 'i link .zip non devono finire tra i capitoli');
+  const ch = chs.find((c) => c.sort_key === 10);
+  const r = await engine.resolveChapterNow(ch.id);
+  assert.equal(r.type, 'images');
+  assert.equal(r.content.images.length, PAGES + 10 % 3);
+  r.content.images.forEach((u, i) => assert.ok(u.endsWith(`/op2/volume002/010/0${i + 1}.jpg`), u));
+});

@@ -84,7 +84,31 @@ export function startMockSite(port = 4000) {
       return send(200, 'text/html; charset=utf-8', reader(v, c, Math.max(1, Math.min(PAGES, +(u.searchParams.get('pagina') || 1)))));
     }
     if ((m = u.pathname.match(/^\/manga8\/img\/onepiece\/(\d+)\/(\d+)\/(\d+)\.jpg$/))) {
+      if (+m[3] < 1 || +m[3] > PAGES) return send(404, 'text/html', 'not found');
       return send(200, 'image/svg+xml', pageSvg(`Cap. ${+m[2]}`, `Pagina ${+m[3]}`));
+    }
+    // variante "onepiecepower 2026": indice /reader/NNN, lettore JS con pagine 01.jpg, 02.jpg… scoperte per tentativi
+    if (u.pathname === '/op2/lista-capitoli') {
+      const body = Object.entries(VOLUMES).map(([v, cs]) => `<div class="vol"><button>📘 Volume ${pad(v)}</button><div>${cs.map((c) =>
+        `<a href="/op2/reader/${pad(c)}">Capitolo ${pad(c)} - ${chapterTitle(c)}</a>`).join('')}</div></div>`).join('')
+        + [1170, 1171, 1172].map((c) => `<a href="http://ouo.io/qs/X?s=http://serverfile.club/download/[OPP]Cap-${c}.zip">Capitolo ${c}</a>`).join('');
+      return send(200, 'text/html', layout('Lista Capitoli One Piece', body));
+    }
+    if ((m = u.pathname.match(/^\/op2\/reader\/(\d+)$/))) {
+      const c = +m[1]; const v = volOf(c);
+      return send(200, 'text/html', layout(`One Piece Capitolo ${pad(c)} ITA`, `
+        <img src="/images/appOPP.png" style="max-width:50px"><img src="/images/stripeLogo.png" style="max-width:60px">
+        <a href="/op2/reader/${pad(c - 1)}"><img id="arrowSxChapter" src="/images/arrowsx.png" class="frecciasxC"></a>
+        <div id="page"><div class="inner"><img class="open" src="/op2/volume${pad(v)}/${pad(c)}/01.jpg"></div></div>
+        <a href="/op2/reader/${pad(c + 1)}"><img id="arrowDxChapter" src="/images/arrowdx.png" class="frecciadxC"></a>
+        <div style="background:url(/images/sfondo.webp)"></div><img src="/images/sfondo-dark.webp">
+        <img src="/php/user/avatar/admin.png" width="30px" height="30px">
+        <script>function getPageLink(p){return '/op2/volume${pad(v)}/${pad(c)}/'+(p<10?'0'+p:p)+'.jpg'}</script>`));
+    }
+    if ((m = u.pathname.match(/^\/op2\/volume\d+\/(\d+)\/(\d+)\.jpg$/))) {
+      const c = +m[1]; const p = +m[2];
+      if (p < 1 || p > PAGES + c % 3) return send(404, 'text/html', 'not found');
+      return send(200, 'image/svg+xml', pageSvg(`Cap. ${c}`, `Pagina ${p}`));
     }
     // variante: tutte le pagine del capitolo in un'unica pagina HTML (lazy-load)
     if (u.pathname === '/fumetto/storia-breve') {

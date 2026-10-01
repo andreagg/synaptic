@@ -3,7 +3,7 @@
 import { App } from '@capacitor/app';
 import * as pdfjs from 'pdfjs-dist';
 import { initStore, Books, Chapters } from './store.js';
-import { initMedia, getMedia, mediaObjectUrl } from './fetcher.js';
+import { initMedia, getMedia, mediaObjectUrl, needsBrowser } from './fetcher.js';
 import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy } from '../src/engine/engine.js';
 import { aiAvailable } from '../src/engine/ai.js';
 import { idbGet, idbSet } from './idb.js';
@@ -86,6 +86,8 @@ export async function api(path, opts = {}) {
   if ((m = p.match(/^\/chapters\/(\d+)$/))) {
     let ch = Chapters.get(m[1]);
     if (!ch) fail(404, 'Capitolo non trovato');
+    // precaricamento: non apriamo il browser interno mentre l'utente sta leggendo
+    if (q.get('prefetch') && ch.status !== 'ready' && needsBrowser(ch.url)) return { skipped: true };
     if (ch.status !== 'ready' || q.get('refresh')) {
       try { ch = await resolveChapterNow(ch.id, { force: !!q.get('refresh') }); } catch (e) { fail(422, e.message, { chapter: Chapters.get(ch.id) }); }
     }
