@@ -20,7 +20,7 @@ ${body}
 <script>var ads = ["/ads/banner1.png"];</script></body></html>`;
 
 function chapterTitle(c) { return TITLES[(c - 1) % TITLES.length]; }
-function volOf(c) { return Object.entries(VOLUMES).find(([, cs]) => cs.includes(c))?.[0]; }
+function volOf(c) { return Object.entries(VOLUMES).find(([, cs]) => cs.includes(c))?.[0] ?? (c >= 20 ? 3 : undefined); }
 function allChapters() { return Object.values(VOLUMES).flat(); }
 
 function index(extra = []) {
@@ -84,7 +84,7 @@ export function startMockSite(port = 4000) {
       return send(200, 'text/html; charset=utf-8', reader(v, c, Math.max(1, Math.min(PAGES, +(u.searchParams.get('pagina') || 1)))));
     }
     if ((m = u.pathname.match(/^\/manga8\/img\/onepiece\/(\d+)\/(\d+)\/(\d+)\.jpg$/))) {
-      if (+m[3] < 1 || +m[3] > PAGES) return send(404, 'text/html', 'not found');
+      if (+m[3] < 1 || +m[3] > PAGES || +m[1] !== +volOf(+m[2])) return send(404, 'text/html', 'not found');
       return send(200, 'image/svg+xml', pageSvg(`Cap. ${+m[2]}`, `Pagina ${+m[3]}`));
     }
     // variante "onepiecepower 2026": indice /reader/NNN, lettore JS con pagine 01.jpg, 02.jpg… scoperte per tentativi
@@ -96,6 +96,7 @@ export function startMockSite(port = 4000) {
     }
     if ((m = u.pathname.match(/^\/op2\/reader\/(\d+)$/))) {
       const c = +m[1]; const v = volOf(c);
+      state.readerHits = (state.readerHits || 0) + 1;
       return send(200, 'text/html', layout(`One Piece Capitolo ${pad(c)} ITA`, `
         <img src="/images/appOPP.png" style="max-width:50px"><img src="/images/stripeLogo.png" style="max-width:60px">
         <a href="/op2/reader/${pad(c - 1)}"><img id="arrowSxChapter" src="/images/arrowsx.png" class="frecciasxC"></a>
@@ -105,9 +106,9 @@ export function startMockSite(port = 4000) {
         <img src="/php/user/avatar/admin.png" width="30px" height="30px">
         <script>function getPageLink(p){return '/op2/volume${pad(v)}/${pad(c)}/'+(p<10?'0'+p:p)+'.jpg'}</script>`));
     }
-    if ((m = u.pathname.match(/^\/op2\/volume\d+\/(\d+)\/(\d+)\.jpg$/))) {
-      const c = +m[1]; const p = +m[2];
-      if (p < 1 || p > PAGES + c % 3) return send(404, 'text/html', 'not found');
+    if ((m = u.pathname.match(/^\/op2\/volume(\d+)\/(\d+)\/(\d+)\.jpg$/))) {
+      const c = +m[2]; const p = +m[3];
+      if (p < 1 || p > PAGES + c % 3 || +m[1] !== +volOf(c)) return send(404, 'text/html', 'not found');
       return send(200, 'image/svg+xml', pageSvg(`Cap. ${c}`, `Pagina ${p}`));
     }
     // variante: tutte le pagine del capitolo in un'unica pagina HTML (lazy-load)

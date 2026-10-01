@@ -77,3 +77,7 @@ html, body { overflow-x: hidden; }
   .hero { grid-template-columns: 96px minmax(0, 1fr); gap: 14px; }
   .hero .row .btn { flex: 1 1 auto; text-align: center; }
 }
+
+.chap-head { padding: 14px 16px; text-align: center; font-weight: 600; background: var(--panel); color: var(--muted); border-top: 3px solid var(--accent); }
+.pages .pg { min-height: 120px; background: #0c0c0e; }
+.pages .pg img { display: block; width: 100%; }

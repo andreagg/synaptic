@@ -66,12 +66,18 @@ export const Chapters = {
     const known = new Set(chaptersOf(bookId).map((c) => c.url));
     let added = 0;
     for (const it of items) {
-      if (known.has(it.url)) continue;
+      if (known.has(it.url)) {
+        if (it.meta) {
+          const c = state.chapters.find((x) => x.book_id === Number(bookId) && x.url === it.url);
+          if (c && !c.meta) { c.meta = copy(it.meta); persist(); }
+        }
+        continue;
+      }
       known.add(it.url);
       const ready = it.type && it.type !== 'page';
       state.chapters.push({ id: id(), book_id: Number(bookId), sort_key: it.sort_key ?? 0, title: it.title, url: it.url,
         type: it.type || 'page', status: ready ? 'ready' : 'pending', content: copy(it.content) ?? null,
-        is_new: !!markNew, read_at: null, progress: 0, error: null, created_at: Date.now() });
+        is_new: !!markNew, read_at: null, progress: 0, error: null, meta: copy(it.meta) ?? null, created_at: Date.now() });
       added++;
     }
     if (added) persist();

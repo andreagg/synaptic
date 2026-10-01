@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS chapters (
 );
 CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_id, sort_key);
 `);
+// migrazione: metadati del capitolo (es. volume)
+if (!db.prepare("SELECT 1 FROM pragma_table_info('chapters') WHERE name = 'meta'").get()) {
+  db.exec('ALTER TABLE chapters ADD COLUMN meta TEXT');
+}
 
 const json = (v) => (v == null ? null : JSON.stringify(v));
 const parse = (s) => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
@@ -56,7 +60,7 @@ function hydrateBook(b) {
 }
 function hydrateChapter(c) {
   if (!c) return c;
-  return { ...c, content: parse(c.content), is_new: !!c.is_new };
+  return { ...c, content: parse(c.content), meta: parse(c.meta), is_new: !!c.is_new };
 }
 
 export const Books = {
@@ -99,21 +103,23 @@ export const Books = {
 export const Chapters = {
   list(bookId) {
     return db.prepare(`SELECT id, book_id, sort_key, title, url, type, status, is_new, read_at, progress, error,
-      created_at FROM chapters WHERE book_id = ? ORDER BY sort_key, id`).all(bookId).map(hydrateChapter);
+      meta, created_at FROM chapters WHERE book_id = ? ORDER BY sort_key, id`).all(bookId).map(hydrateChapter);
   },
   get(id) { return hydrateChapter(db.prepare('SELECT * FROM chapters WHERE id = ?').get(id)); },
   /** Inserisce i capitoli non ancora presenti; restituisce quanti sono nuovi. */
   upsertMany(bookId, items, { markNew = true } = {}) {
-    const ins = db.prepare(`INSERT OR IGNORE INTO chapters (book_id, sort_key, title, url, type, status, content, is_new)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    const ins = db.prepare(`INSERT OR IGNORE INTO chapters (book_id, sort_key, title, url, type, status, content, is_new, meta)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const fillMeta = db.prepare('UPDATE chapters SET meta = ? WHERE book_id = ? AND url = ? AND meta IS NULL');
     let added = 0;
     db.exec('BEGIN');
     try {
       for (const it of items) {
         const ready = it.type && it.type !== 'page';
         const r = ins.run(bookId, it.sort_key ?? 0, it.title, it.url, it.type || 'page',
-          ready ? 'ready' : 'pending', json(it.content), markNew ? 1 : 0);
+          ready ? 'ready' : 'pending', json(it.content), markNew ? 1 : 0, json(it.meta));
         added += Number(r.changes);
+        if (!r.changes && it.meta) fillMeta.run(json(it.meta), bookId, it.url);
       }
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }

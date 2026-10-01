@@ -126,9 +126,9 @@ async function renderReader(id) {
   }
   const bar = `<div class="reader-bar" id="rbar">
       <a class="btn" href="#/book/${ch.book.id}">←</a>
-      <div class="title"><div class="muted" style="font-size:11px">${esc(ch.book.title)}</div>${esc(ch.title)}</div>
-      ${ch.prev ? `<a class="btn" href="#/read/${ch.prev.id}" title="Precedente">‹</a>` : ''}
-      ${ch.next ? `<a class="btn" href="#/read/${ch.next.id}" title="Successivo">›</a>` : ''}
+      <div class="title"><div class="muted" style="font-size:11px">${esc(ch.book.title)}</div><span id="rtitle">${esc(ch.title)}</span></div>
+      <a class="btn" id="rprev" href="${ch.prev ? `#/read/${ch.prev.id}` : '#'}" title="Precedente" ${ch.prev ? '' : 'hidden'}>‹</a>
+      <a class="btn" id="rnext" href="${ch.next ? `#/read/${ch.next.id}` : '#'}" title="Successivo" ${ch.next ? '' : 'hidden'}>›</a>
     </div><div class="progress" id="prog"></div>`;
   const nav = `<div class="reader-nav">
       ${ch.prev ? `<a class="btn" href="#/read/${ch.prev.id}">‹ ${esc(ch.prev.title)}</a>` : ''}
@@ -136,8 +136,9 @@ async function renderReader(id) {
     </div>`;
   const ref = ch.content?.referer || ch.url;
   if (ch.type === 'images') {
-    $view.innerHTML = bar + `<div class="pages">${ch.content.images.map((u, i) =>
-      `<img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.classList.add('loaded')">`).join('')}</div>` + nav;
+    $view.innerHTML = bar + '<div class="pages" id="pages"></div><div class="reader-nav" id="tail"></div>';
+    continuousReader(ch);
+    return;
   } else if (ch.type === 'pdf') {
     if (backend.renderPdf) {
       $view.innerHTML = bar + '<div class="pages" id="pdfpages"><p class="muted" style="text-align:center">Apro il PDF…</p></div>' + nav;
@@ -179,6 +180,98 @@ async function renderReader(id) {
   };
   // pre-carica il capitolo successivo sul server
   if (ch.next) setTimeout(() => api(`/chapters/${ch.next.id}?prefetch=1`).catch(() => {}), 1500);
+}
+
+/**
+ * Lettura continua dei fumetti: i capitoli si susseguono uno sotto l'altro.
+ * Arrivati in fondo si carica il successivo; titolo, indirizzo e progresso seguono lo scorrimento.
+ */
+function continuousReader(first) {
+  const pagesEl = document.getElementById('pages');
+  const tail = document.getElementById('tail');
+  const rbar = document.getElementById('rbar'); const prog = document.getElementById('prog');
+  const titleEl = document.getElementById('rtitle');
+  const loaded = [];
+  let last = first; let current = first; let loading = false;
+
+  // le immagini si scaricano solo quando si avvicinano allo schermo
+  const lazy = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (e.isIntersecting) { lazy.unobserve(e.target); hydrate(e.target.parentNode); }
+  }), { rootMargin: '2500px 0px' });
+
+  const append = (c) => {
+    const sec = document.createElement('section');
+    sec.className = 'chap'; sec.dataset.id = c.id;
+    const ref = c.content.referer || c.url;
+    sec.innerHTML = `<div class="chap-head">${esc(c.title)}</div>` + c.content.images.map((u, i) =>
+      `<div class="pg"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.classList.add('loaded')"></div>`).join('');
+    pagesEl.appendChild(sec);
+    sec.querySelectorAll('img[data-m]').forEach((img) => lazy.observe(img));
+    loaded.push({ ch: c, el: sec });
+  };
+
+  const loadNext = async () => {
+    if (loading) return;
+    if (!last.next) { tail.innerHTML = `<a class="btn" href="#/book/${first.book.id}">Fine · torna al libro</a>`; return; }
+    loading = true;
+    tail.innerHTML = `<span class="spinner"></span>&nbsp;<span class="muted">Carico ${esc(last.next.title)}…</span>`;
+    try {
+      const c = await api(`/chapters/${last.next.id}`);
+      if (c.type === 'images' && c.content?.images?.length) {
+        append(c); last = c; tail.innerHTML = '';
+      } else {
+        tail.innerHTML = `<a class="btn primary" href="#/read/${c.id}">${esc(c.title)} ›</a>`;
+        last = { next: null, noMore: true };
+      }
+    } catch (e) {
+      tail.innerHTML = `<p class="muted">⚠️ ${esc(e.message)}</p><button class="btn" id="retry">Riprova</button>`;
+      document.getElementById('retry').onclick = () => loadNext();
+      loading = false;
+      return;
+    }
+    loading = false;
+    if (!last.noMore) { tailObs.unobserve(tail); tailObs.observe(tail); } // ricontrolla se serve un altro capitolo
+  };
+  const tailObs = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadNext(); }, { rootMargin: '3000px 0px' });
+
+  append(first);
+  tailObs.observe(tail);
+  // riprende dal punto in cui si era rimasti nel capitolo
+  try {
+    const off = Number(localStorage.getItem(`pos:${first.id}`));
+    if (off > 0) setTimeout(() => scrollTo(0, loaded[0].el.offsetTop + off), 400);
+  } catch { /* storage non disponibile */ }
+  api(`/chapters/${first.id}/progress`, { method: 'POST', body: { progress: 0 } }).catch(() => {});
+
+  let lastY = 0; let saved = 0;
+  window.onscroll = () => {
+    const y = scrollY;
+    rbar?.classList.toggle('hide', y > lastY && y > 80); lastY = y;
+    const probe = innerHeight * 0.3;
+    let cur = loaded[0];
+    for (const l of loaded) if (l.el.getBoundingClientRect().top <= probe) cur = l;
+    const r = cur.el.getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (probe - r.top) / Math.max(1, r.height - innerHeight * 0.7)));
+    if (prog) prog.style.width = (p * 100) + '%';
+    if (cur.ch.id !== current.id) {
+      api(`/chapters/${current.id}/progress`, { method: 'POST', body: { progress: 1 } }).catch(() => {});
+      current = cur.ch;
+      titleEl.textContent = current.title;
+      history.replaceState(null, '', `#/read/${current.id}`);
+      const prev = document.getElementById('rprev'); const next = document.getElementById('rnext');
+      prev.hidden = !current.prev; if (current.prev) prev.href = `#/read/${current.prev.id}`;
+      next.hidden = !current.next; if (current.next) next.href = `#/read/${current.next.id}`;
+      saved = 0;
+    }
+    try { localStorage.setItem(`pos:${current.id}`, String(Math.max(0, -r.top))); } catch { /* ignore */ }
+    if (Date.now() - saved > 4000) { saved = Date.now(); api(`/chapters/${current.id}/progress`, { method: 'POST', body: { progress: p } }).catch(() => {}); }
+  };
+  $view.onclick = (e) => { if (e.target.tagName === 'IMG') rbar?.classList.toggle('hide'); };
+  document.onkeydown = (e) => {
+    if (!document.body.classList.contains('reading')) return;
+    if (e.key === 'ArrowRight' && current.next) location.hash = `#/read/${current.next.id}`;
+    if (e.key === 'ArrowLeft' && current.prev) location.hash = `#/read/${current.prev.id}`;
+  };
 }
 
 // ---------------------------------------------------------------- router

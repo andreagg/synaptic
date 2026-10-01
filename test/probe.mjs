@@ -92,6 +92,15 @@ if (list?.items?.length) {
     const res = {};
     for (const n of ['01', '02', '10', '18', '19', '20', '25', '40']) res[n] = await probeUrl(base + n + '.jpg', ch.url);
     log('probe-sequenza', res);
+    // schema appreso dal capitolo 9 applicato ad altri capitoli (volume letto dall'indice)
+    const checks = {};
+    for (const n of [0, 1, 100, 1000, 1150, 1185, 1190]) {
+      const it = list.items.find((i) => i.sort_key === n);
+      if (!it?.meta?.volume) { checks[n] = 'volume sconosciuto'; continue; }
+      const u = `https://onepiecepower.com/manga8/onepiece/volumi/volume${it.meta.volume.padStart(3, '0')}/${String(n).padStart(3, '0')}/01.jpg`;
+      checks[n] = `${await probeUrl(u, it.url)} ${u}`;
+    }
+    log('schema-su-altri-capitoli', checks);
   }
 }
 await browser.close();

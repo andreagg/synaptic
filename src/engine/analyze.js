@@ -73,7 +73,7 @@ export function extractLinks($, base) {
       return;
     }
     seen.add(key);
-    out.push({ url, text, order: i, chrome: $(el).closest(CHROME_SEL).length > 0 });
+    out.push({ url, text, order: i, chrome: $(el).closest(CHROME_SEL).length > 0, volume: volumeOf($, el) });
   });
   // opzioni di <select> che puntano a URL (menu a tendina "vai al capitolo")
   $('select option').each((i, el) => {
@@ -85,6 +85,25 @@ export function extractLinks($, base) {
     out.push({ url, text: clean($(el).text()), order: 100000 + i, chrome: false, fromSelect: true });
   });
   return out;
+}
+
+const VOL_RE = /\b(?:vol(?:ume)?|tomo)\.?\s*(\d+)/i;
+/**
+ * Volume a cui appartiene un link: il titolo (h1-h6, button, summary…) del blocco che lo contiene,
+ * oppure il titolo più vicino che lo precede. Serve per capire la struttura "Volume → Capitoli".
+ */
+function volumeOf($, el) {
+  let node = $(el);
+  for (let depth = 0; depth < 5; depth++) {
+    node = node.parent();
+    if (!node.length || node.is('body')) break;
+    const heads = node.children('h1,h2,h3,h4,h5,h6,button,summary,legend,.title,.volume-title,strong');
+    for (const h of heads.toArray()) {
+      const m = $(h).text().match(VOL_RE);
+      if (m) return m[1];
+    }
+  }
+  return null;
 }
 
 /** Estrae il numero di capitolo più plausibile da testo/URL. */
@@ -151,6 +170,7 @@ function toItems(group) {
     url: l.url,
     num: chapterNumber(l.text, l.url),
     order: l.order,
+    volume: l.volume || null,
   }));
   const withNum = items.filter((i) => i.num != null).length;
   if (withNum >= items.length * 0.7) {
@@ -161,8 +181,10 @@ function toItems(group) {
     const known = items.filter((i) => i.num != null);
     if (known.length >= 2 && known[0].num > known[known.length - 1].num) items.reverse();
   }
-  return items.map((i, idx) => ({ title: i.title.slice(0, 200), url: i.url, sort_key: i.num ?? idx, _idx: idx }))
-    .map(({ _idx, ...rest }) => rest);
+  return items.map((i, idx) => ({
+    title: i.title.slice(0, 200), url: i.url, sort_key: i.num ?? idx,
+    ...(i.volume != null ? { meta: { volume: i.volume } } : {}),
+  }));
 }
 
 /** Trasforma una firma in una regex riutilizzabile per i controlli futuri. */

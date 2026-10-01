@@ -192,7 +192,17 @@ async function resolveChapter(chapterId, force) {
       const firstNew = Chapters.list(book.id).find((c) => c.url === items[0].url);
       return firstNew ? resolveChapter(firstNew.id, force) : null;
     }
-    if (res.rules) Books.update(book.id, { rules: { ...(book.rules || {}), ...res.rules } });
+    const fresh = Books.get(book.id); // extractChapter può aver aggiornato le regole
+    let rules = { ...(fresh.rules || {}), ...(res.rules || {}) };
+    // impara lo schema degli URL delle immagini (es. …/volume{vol}/{cap}/{page}.jpg)
+    if (res.type === 'images' && !rules.imageTemplate && res.content?.images?.length >= 2) {
+      const cands = templateCandidates(res.content.images[0], ch);
+      if (cands.length) {
+        rules = { ...rules, imageTemplates: cands };
+        console.log(`[schema] candidati appresi da "${ch.title}": ${cands.join(' | ')}`);
+      }
+    }
+    if (res.rules || rules.imageTemplates !== fresh.rules?.imageTemplates) Books.update(book.id, { rules });
     Chapters.update(ch.id, { type: res.type, content: res.content, status: 'ready', error: null });
     if (book.kind === 'unknown' || book.kind === 'series') {
       Books.update(book.id, { kind: res.type === 'images' ? 'manga' : res.type === 'pdf' ? 'pdf' : res.type === 'html' ? 'article' : 'mixed' });
@@ -207,6 +217,9 @@ async function resolveChapter(chapterId, force) {
 async function extractChapter(book, ch) {
   const rules = book.rules || {};
   if (FILE_EXT.test(ch.url)) return { type: fileType(ch.url), content: { url: ch.url } };
+  // scorciatoia: con lo schema appreso scarichiamo le immagini senza aprire la pagina del capitolo
+  const fromTemplate = await imagesFromTemplate(book, ch).catch(() => null);
+  if (fromTemplate) return fromTemplate;
   const page = await fetchPage(ch.url, { render: book.render_js, referer: book.source_url });
   if (!page.html) {
     const type = fileType(page.url, page.contentType);
@@ -340,6 +353,69 @@ async function probeSequence(book, url, referer) {
     Books.update(book.id, { message: `Pagine trovate: ${found.size}` });
   }
   return [...found.entries()].sort((a, b) => a[0] - b[0]).map(([, u]) => u);
+}
+
+// ---------------------------------------------------------------------------
+// Schema degli URL delle immagini: impararlo da un capitolo e applicarlo agli altri
+// ---------------------------------------------------------------------------
+const chapterNum = (ch) => (Number.isInteger(ch.sort_key) ? ch.sort_key : null);
+const volumeNum = (ch) => (ch.meta?.volume != null ? parseInt(ch.meta.volume, 10) : null);
+
+/**
+ * Dall'URL della prima pagina di un capitolo ricava gli schemi possibili, sostituendo i numeri
+ * con {cap}, {vol} e {page}. Se un numero è ambiguo (es. capitolo 1 nel volume 1) genera
+ * più candidati: quello giusto verrà confermato sul capitolo successivo.
+ */
+function templateCandidates(url, ch) {
+  const cap = chapterNum(ch); const vol = volumeNum(ch);
+  if (cap == null) return [];
+  const u = new URL(url);
+  const parts = u.pathname.split(/(\d+)/); // numeri agli indici dispari
+  const numIdx = parts.map((p, i) => (i % 2 ? i : -1)).filter((i) => i >= 0);
+  if (!numIdx.length) return [];
+  const pageIdx = numIdx[numIdx.length - 1];
+  let variants = [[...parts]];
+  variants[0][pageIdx] = `{page:${parts[pageIdx].length}}`;
+  for (const i of numIdx.slice(0, -1)) {
+    const n = parseInt(parts[i], 10); const w = parts[i].length;
+    const opts = [];
+    if (n === cap) opts.push(`{cap:${w}}`);
+    if (vol != null && n === vol) opts.push(`{vol:${w}}`);
+    if (!opts.length) continue;
+    if (n === cap && n === (vol ?? -1)) opts.push(parts[i]); // potrebbe anche essere una costante
+    variants = variants.flatMap((v) => opts.map((o) => { const c = [...v]; c[i] = o; return c; }));
+  }
+  return [...new Set(variants.map((v) => u.origin + v.join('') + u.search))]
+    .filter((t) => t.includes('{cap:')).slice(0, 8);
+}
+
+function fillTemplate(t, ch, page) {
+  return t.replace(/\{(cap|vol|page):(\d+)\}/g, (_, k, w) => {
+    const n = k === 'cap' ? chapterNum(ch) : k === 'vol' ? volumeNum(ch) : page;
+    return String(n).padStart(Number(w), '0');
+  });
+}
+
+async function imagesFromTemplate(book, ch) {
+  const rules = book.rules || {};
+  const list = rules.imageTemplate ? [rules.imageTemplate] : rules.imageTemplates || [];
+  if (!list.length || chapterNum(ch) == null) return null;
+  for (const t of list) {
+    if (t.includes('{vol:') && volumeNum(ch) == null) continue;
+    for (const start of [1, 0]) {
+      const first = fillTemplate(t, ch, start);
+      if (!(await probeUrl(first, ch.url))) continue;
+      const images = await probeSequence(book, first, ch.url);
+      if (images.length < 2) continue;
+      if (!rules.imageTemplate) {
+        Books.update(book.id, { rules: { ...rules, imageTemplate: t, imageTemplates: undefined } });
+        console.log(`[schema] confermato: ${t}`);
+      }
+      console.log(`[schema] "${ch.title}": ${images.length} pagine senza aprire il capitolo`);
+      return { type: 'images', content: { images, referer: ch.url } };
+    }
+  }
+  return null;
 }
 
 /** Numero di pagina: il numero che cambia tra l'URL del capitolo e quello della pagina. */

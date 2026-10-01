@@ -86,3 +86,16 @@ test('lettore JS con pagine numerate (stile onepiecepower 2026): pagine trovate 
   assert.equal(r.content.images.length, PAGES + 10 % 3);
   r.content.images.forEach((u, i) => assert.ok(u.endsWith(`/op2/volume002/010/0${i + 1}.jpg`), u));
 });
+
+test('schema immagini appreso: gli altri capitoli si scaricano senza aprire la pagina del lettore', async () => {
+  const b = Books.byUrl(site.url + '/op2/lista-capitoli');
+  const chs = Chapters.list(b.id);
+  assert.equal(chs.find((c) => c.sort_key === 17).meta?.volume, '003', 'volume letto dall\'indice');
+  assert.ok(Books.get(b.id).rules.imageTemplates?.length || Books.get(b.id).rules.imageTemplate, 'schema candidato appreso');
+  const hits = site.state.readerHits;
+  const r = await engine.resolveChapterNow(chs.find((c) => c.sort_key === 17).id);
+  assert.equal(site.state.readerHits, hits, 'la pagina del capitolo non deve essere visitata');
+  assert.equal(r.content.images.length, PAGES + 17 % 3);
+  assert.ok(r.content.images[0].endsWith('/op2/volume003/017/01.jpg'), r.content.images[0]);
+  assert.equal(Books.get(b.id).rules.imageTemplate, site.url + '/op2/volume{vol:3}/{cap:3}/{page:2}.jpg');
+});
