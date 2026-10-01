@@ -29,7 +29,10 @@ window.addEventListener('error', (e) => console.error('[js]', e.message));
 window.addEventListener('unhandledrejection', (e) => console.error('[promise]', e.reason?.message || String(e.reason)));
 export const logs = () => logLines.join('\n');
 
+export const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+
 export async function init() {
+  console.log(`Synaptic Library ${version} · ${navigator.userAgent}`);
   const s = (await idbGet('kv', 'settings').catch(() => null)) || {};
   globalThis.SYNAPTIC_CONFIG = s;
   await initStore();

@@ -89,6 +89,7 @@ async function renderBook(id) {
       <strong>${b.chapters.length} elementi${b.chapters.some((c) => c.is_new) ? ` · <span style="color:var(--accent)">${b.chapters.filter((c) => c.is_new).length} nuovi</span>` : ''}</strong>
       <div class="row"><input id="q" placeholder="Cerca…" value="${esc(filter)}"><button class="btn" id="sort">${sortDesc ? '↑' : '↓'}</button></div>
     </div>
+    ${!b.chapters.length && !busy ? `<div class="empty" style="padding:24px"><p>Nessun capitolo ancora.</p><button class="btn primary" onclick="document.getElementById('scan').click()">⟳ Cerca i capitoli</button></div>` : ''}
     <ul class="chapters">${chs.map((c) => `
       <li class="${c.read_at ? 'read' : ''}"><a href="#/read/${c.id}">
         <span class="ico">${c.status === 'error' ? '⚠️' : ICON[c.type] || '•'}</span>
@@ -225,7 +226,7 @@ async function renderSettings() {
   clearInterval(timer);
   document.body.classList.remove('reading');
   const cur = await backend.settings.get();
-  $view.innerHTML = `<h2>Impostazioni</h2>
+  $view.innerHTML = `<h2>Impostazioni</h2><p class="muted">Versione ${esc(backend.version || '')}</p>
     <label class="muted">Chiave API Anthropic (attiva l'AI per i siti difficili)
       <input id="key" type="password" value="${esc(cur.ANTHROPIC_API_KEY || '')}" placeholder="sk-ant-…" style="margin-top:6px"></label>
     <div class="row" style="margin:10px 0 24px"><button class="btn primary" id="save">Salva</button></div>

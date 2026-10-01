@@ -19,3 +19,4 @@ export const renderPdf = null;   // il browser desktop mostra i PDF in un iframe
 export const settings = null;    // la configurazione del server è nelle variabili d'ambiente
 export async function init() {}
 export const logs = null;
+export const version = 'server';

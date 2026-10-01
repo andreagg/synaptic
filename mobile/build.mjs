@@ -29,6 +29,7 @@ await esbuild.build({
   bundle: true, format: 'esm', platform: 'browser', target: ['chrome100'],
   outfile: path.join(out, 'app.js'), minify: true, sourcemap: false, plugins: [mobileSwap],
   logLevel: 'info',
+  define: { __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || 'dev') },
 });
 fs.copyFileSync(path.join(root, 'public/style.css'), path.join(out, 'style.css'));
 fs.copyFileSync(path.join(root, 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs'), path.join(out, 'pdf.worker.min.mjs'));

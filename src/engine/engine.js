@@ -74,7 +74,7 @@ export function scanBook(bookId) {
       Books.update(bookId, { message: patch.message });
       return { added, total: found.items.length };
     } catch (e) {
-      Books.update(bookId, { status: 'error', message: e.message, last_checked: Date.now() });
+      Books.update(bookId, { status: 'error', message: `⚠️ Scansione non riuscita: ${e.message}`, last_checked: Date.now() });
       console.error(`[${bookId}] scansione fallita:`, e);
       throw e;
     }
@@ -372,7 +372,12 @@ async function fillCover(bookId) {
 // ---------------------------------------------------------------------------
 // 4. Download completo per lettura offline
 // ---------------------------------------------------------------------------
-export function downloadBook(bookId) {
+export async function downloadBook(bookId) {
+  // se il libro non ha ancora capitoli, prima li cerchiamo
+  if (!Chapters.list(bookId).length) {
+    try { await scanBook(bookId); } catch { return Books.get(bookId); }
+    if (!Chapters.list(bookId).length) return Books.get(bookId);
+  }
   return exclusive(bookId, async () => {
     const book = Books.get(bookId);
     Books.update(bookId, { status: 'downloading' });

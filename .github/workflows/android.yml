@@ -29,6 +29,8 @@ jobs:
         run: npm test
       - name: Web app per Android
         run: npm run build:mobile
+        env:
+          APP_VERSION: 1.0.${{ github.run_number }}
       - name: Progetto Android (Capacitor)
         run: |
           npx cap add android
