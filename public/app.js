@@ -8,12 +8,32 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const mediaAttr = (u, ref) => `data-m="${esc(u)}" data-ref="${esc(ref || '')}"`;
 function hydrate(root = $view) {
   root.querySelectorAll('[data-m]').forEach(async (el) => {
-    const u = el.dataset.m; el.removeAttribute('data-m');
+    const u = el.dataset.m; const ref = el.dataset.ref || undefined;
+    el.removeAttribute('data-m');
     try {
-      const src = await backend.mediaUrl(u, el.dataset.ref || undefined);
+      const src = await backend.mediaUrl(u, ref);
       if (el.tagName === 'IMG') el.src = src; else el.style.backgroundImage = `url('${src}')`;
-    } catch { if (el.tagName === 'IMG') el.alt = '⚠️ immagine non disponibile'; }
+    } catch {
+      // ripiego: immagine diretta senza Referer (molte protezioni hotlink lo accettano)
+      if (el.tagName !== 'IMG') return;
+      el.referrerPolicy = 'no-referrer';
+      el.onerror = () => imageFailed(el, u, ref);
+      el.src = u;
+    }
   });
+}
+function imageFailed(el, u, ref) {
+  const box = document.createElement('div');
+  box.className = 'img-fail';
+  box.innerHTML = `<span>⚠️ ${esc(el.alt || 'Immagine')} non caricata</span><button class="btn">Riprova</button>`;
+  box.querySelector('button').onclick = async () => {
+    box.querySelector('button').textContent = '…';
+    try {
+      const src = backend.mediaUrlForce ? await backend.mediaUrlForce(u, ref) : await backend.mediaUrl(u, ref);
+      el.onerror = null; el.src = src; box.replaceWith(el);
+    } catch (e) { box.querySelector('span').textContent = `⚠️ ${e.message}`; box.querySelector('button').textContent = 'Riprova'; }
+  };
+  el.replaceWith(box);
 }
 const toast = (msg) => { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); };
 const KIND = { manga: '📖 Fumetto', series: '📚 Serie', pdf: '📄 PDF', article: '📰 Testo', mixed: '🗂️ Misto', unknown: '…' };
@@ -119,7 +139,8 @@ async function renderBook(id) {
           <button class="btn" data-act="scan" ${busy ? 'disabled' : ''}>⟳ Cerca aggiornamenti</button>
           <button class="btn" data-act="select">${selecting ? '✕ Annulla selezione' : '⬇ Scegli capitoli da scaricare'}</button>
         </div>
-        <div class="status">${busy || queued.size ? '<span class="spinner"></span>' : ''}<span>${esc(b.message || '')}</span></div>
+        <div class="status">${busy || queued.size ? '<span class="spinner"></span>' : ''}<span>${esc(b.message || '')}</span>
+          ${queued.size ? `<button class="btn" data-act="cancel" style="padding:4px 10px">✕ Annulla (${queued.size})</button>` : ''}</div>
         <div class="row muted" style="font-size:13px">
           <span>${KIND[b.kind] || ''}${offlineCount ? ` · 📥 ${offlineCount} offline` : ''}</span> ·
           <label>Aggiorna <select data-act="every" style="width:auto;padding:4px 8px">
@@ -164,6 +185,7 @@ $view.addEventListener('click', async (e) => {
   const visible = () => b.chapters.filter((c) => !filter || c.title.toLowerCase().includes(filter.toLowerCase()));
   if (act === 'scan') { await api(`/books/${b.id}/scan`, { method: 'POST' }); toast('Controllo aggiornamenti avviato'); setTimeout(refresh, 300); }
   if (act === 'select') { selecting = !selecting; selected.clear(); refresh(); }
+  if (act === 'cancel') { await api(`/books/${b.id}/download`, { method: 'POST', body: { cancel: true } }); toast('Download annullati'); setTimeout(refresh, 300); }
   if (act === 'sort') { sortDesc = !sortDesc; refresh(); }
   if (act === 'sel-all') { visible().forEach((c) => selected.add(c.id)); refresh(); }
   if (act === 'sel-none') { selected.clear(); refresh(); }
@@ -290,7 +312,7 @@ function continuousReader(first) {
     sec.className = 'chap'; sec.dataset.id = c.id;
     const ref = c.content.referer || c.url;
     sec.innerHTML = `<div class="chap-head">${esc(c.title)}</div>` + c.content.images.map((u, i) =>
-      `<div class="pg"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.classList.add('loaded')"></div>`).join('');
+      `<div class="pg"><img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.parentNode.classList.add('ok')"></div>`).join('');
     pagesEl.appendChild(sec);
     sec.querySelectorAll('img[data-m]').forEach((img) => lazy.observe(img));
     loaded.push({ ch: c, el: sec, imgs: [...sec.querySelectorAll('.pg')] });
@@ -320,7 +342,7 @@ function continuousReader(first) {
     loading = false;
     if (!last.noMore) { tailObs.unobserve(tail); tailObs.observe(tail); } // ricontrolla se serve un altro capitolo
   };
-  const tailObs = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadNext(); }, { rootMargin: '3000px 0px' });
+  const tailObs = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadNext(); }, { rootMargin: '1200px 0px' });
 
   append(first);
   tailObs.observe(tail);
@@ -415,12 +437,15 @@ async function renderSettings() {
     <label class="muted">Chiave API Anthropic (attiva l'AI per i siti difficili)
       <input id="key" type="password" value="${esc(cur.ANTHROPIC_API_KEY || '')}" placeholder="sk-ant-…" style="margin-top:6px"></label>
     <div class="row" style="margin:10px 0 24px"><button class="btn primary" id="save">Salva</button></div>
+    ${backend.diagnose ? '<div class="row" style="margin:0 0 16px"><button class="btn" id="diag">🔍 Test download immagini</button></div>' : ''}
     <div class="toolbar"><strong>Registro diagnostico</strong>
       <div class="row"><button class="btn" id="copy">Copia</button><button class="btn" id="refresh">Aggiorna</button></div></div>
     <pre id="log" style="white-space:pre-wrap;word-break:break-all;background:var(--panel);padding:12px;border-radius:12px;font-size:11px;max-height:60vh;overflow:auto"></pre>`;
   const show = () => { const el = document.getElementById('log'); el.textContent = backend.logs?.() || '(vuoto)'; el.scrollTop = el.scrollHeight; };
   show();
   document.getElementById('refresh').onclick = show;
+  const diag = document.getElementById('diag');
+  if (diag) diag.onclick = async () => { diag.disabled = true; diag.textContent = 'Test in corso…'; await backend.diagnose().catch((e) => console.error(e)); diag.disabled = false; diag.textContent = '🔍 Test download immagini'; show(); };
   document.getElementById('copy').onclick = () => navigator.clipboard.writeText(backend.logs?.() || '').then(() => toast('Registro copiato'), () => toast('Copia non riuscita'));
   document.getElementById('save').onclick = async () => {
     const key = document.getElementById('key').value.trim();

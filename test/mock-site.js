@@ -101,6 +101,7 @@ export function startMockSite(port = 4000) {
         <img src="/images/appOPP.png" style="max-width:50px"><img src="/images/stripeLogo.png" style="max-width:60px">
         <a href="/op2/reader/${pad(c - 1)}"><img id="arrowSxChapter" src="/images/arrowsx.png" class="frecciasxC"></a>
         <div id="page"><div class="inner"><img class="open" src="/op2/volume${pad(v)}/${pad(c)}/01.jpg"></div></div>
+        <div id="sliderPages"><img class="open" src="/op2/volume${pad(v)}/${pad(c)}/02.jpg"></div>
         <a href="/op2/reader/${pad(c + 1)}"><img id="arrowDxChapter" src="/images/arrowdx.png" class="frecciadxC"></a>
         <div style="background:url(/images/sfondo.webp)"></div><img src="/images/sfondo-dark.webp">
         <img src="/php/user/avatar/admin.png" width="30px" height="30px">

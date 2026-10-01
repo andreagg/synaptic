@@ -107,6 +107,7 @@ let webviewLock = Promise.resolve();
 export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
   const run = () => new Promise((resolve, reject) => {
     const handles = [];
+    if (session.open) console.warn('[browser] sessione immagini ancora aperta');
     let done = false; let poll = null; let timer = null; let lastLen = -1;
     const finish = async (err, value) => {
       if (done) return;
@@ -151,32 +152,61 @@ export function fetchViaWebView(url, { visible = true, timeout = 90000 } = {}) {
 const cached = new Set();
 const objectUrls = new Map();
 const inflight = new Map();
+// host le cui immagini non si scaricano con l'HTTP nativo (anti-bot): si passa dal browser interno
+const mediaBlocked = new Set();
+export const isMediaBlocked = (url) => { try { return mediaBlocked.has(new URL(url).host); } catch { return false; } };
+
 export async function initMedia() {
   for (const k of await idbKeys('media').catch(() => [])) cached.add(k);
 }
 export const isCached = (url) => cached.has(url);
 
-export async function getMedia(url, referer) {
+const okImage = (status, type) => status >= 200 && status < 300 && !/text\/html/i.test(type || '');
+
+/**
+ * Scarica (e mette in cache) un'immagine o un file.
+ * allowBrowser: se l'HTTP nativo è bloccato, usa la sessione nel browser interno (visibile).
+ */
+export async function getMedia(url, referer, { allowBrowser = true } = {}) {
   if (cached.has(url)) {
     const rec = await idbGet('media', url);
     if (rec) return rec;
   }
-  if (inflight.has(url)) return inflight.get(url);
+  const key = url + (allowBrowser ? '' : '#nb');
+  if (inflight.has(key)) return inflight.get(key);
   const p = (async () => {
-    const res = await request(url, { referer: referer || new URL(url).origin + '/', binary: true });
-    if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-    const rec = { blob: res.data, type: res.type || res.data.type };
+    let rec = null;
+    if (!isMediaBlocked(url) || !native) {
+      try {
+        const res = await request(url, { referer: referer || new URL(url).origin + '/', binary: true, retries: 1 });
+        if (okImage(res.status, res.type)) rec = { blob: res.data, type: res.type || res.data.type };
+        else {
+          console.warn(`[media] HTTP ${res.status} (${res.type || '?'}) ${url}`);
+          if (native && [401, 403, 429, 503].includes(res.status) || /text\/html/i.test(res.type || '')) {
+            mediaBlocked.add(new URL(url).host);
+            console.warn(`[media] ${new URL(url).host}: download nativo bloccato, userò il browser interno`);
+          }
+        }
+      } catch (e) { console.warn(`[media] errore ${e.message} ${url}`); }
+    }
+    if (!rec && native && allowBrowser) {
+      const r = await browserFetch(url, { pageUrl: new URL(url).origin + '/' });
+      if (!okImage(r.status, r.type) || !r.data) throw new Error(`HTTP ${r.status || r.error} (browser) su ${url}`);
+      rec = { blob: b64ToBlob(r.data, r.type), type: r.type };
+    }
+    if (!rec) throw new Error(`download non riuscito: ${url}`);
     await idbSet('media', url, rec);
     cached.add(url);
     return rec;
-  })().finally(() => inflight.delete(url));
-  inflight.set(url, p);
+  })().finally(() => inflight.delete(key));
+  inflight.set(key, p);
   return p;
 }
 
+/** URL da mostrare nell'app (blob dalla cache). Non apre mai il browser interno. */
 export async function mediaObjectUrl(url, referer) {
   if (objectUrls.has(url)) return objectUrls.get(url);
-  const { blob } = await getMedia(url, referer);
+  const { blob } = await getMedia(url, referer, { allowBrowser: false });
   const o = URL.createObjectURL(blob);
   objectUrls.set(url, o);
   return o;
@@ -184,16 +214,131 @@ export async function mediaObjectUrl(url, referer) {
 
 /** Verifica se un'immagine esiste (per le pagine numerate in sequenza). */
 export async function probeUrl(url, referer) {
+  if (cached.has(url)) return true;
+  if (native && isMediaBlocked(url)) {
+    const r = await browserFetch(url, { pageUrl: new URL(url).origin + '/', probe: true }).catch(() => ({ status: 0 }));
+    console.log(`[http] ${r.status} prova (browser) ${url}`);
+    return okImage(r.status, r.type);
+  }
   return withHostSlot(url, async () => {
     try {
       if (native) {
-        const r = await CapacitorHttp.request({ url, method: 'HEAD', headers: { ...IMG_HEADERS, ...(referer ? { Referer: referer } : {}) }, connectTimeout: 20000, readTimeout: 20000 });
+        // GET del primo byte: più affidabile di HEAD con l'HTTP nativo e con alcuni server
+        const r = await CapacitorHttp.request({ url, method: 'GET', responseType: 'text',
+          headers: { ...IMG_HEADERS, Range: 'bytes=0-0', ...(referer ? { Referer: referer } : {}) }, connectTimeout: 20000, readTimeout: 20000 });
         const type = lower(r.headers)['content-type'] || '';
         console.log(`[http] ${r.status} prova ${url}`);
-        return r.status >= 200 && r.status < 300 && !/text\/html/i.test(type);
+        if ([401, 403, 429, 503].includes(r.status) || (/text\/html/i.test(type) && r.status < 300)) {
+          mediaBlocked.add(new URL(url).host);
+          console.warn(`[media] ${new URL(url).host}: prove native bloccate (HTTP ${r.status}), userò il browser interno`);
+          return probeUrl(url, referer);
+        }
+        return okImage(r.status, type);
       }
       const r = await fetch(url, { method: 'HEAD' });
-      return r.ok && !/text\/html/i.test(r.headers.get('content-type') || '');
-    } catch { return false; }
+      return okImage(r.status, r.headers.get('content-type'));
+    } catch (e) { console.warn(`[http] prova fallita ${e.message} ${url}`); return false; }
   });
+}
+
+// --- sessione nel browser interno per scaricare immagini dal sito stesso ---------------
+// Resta aperta finché arrivano richieste (si chiude dopo qualche secondo di inattività).
+const session = { open: false, opening: null, origin: null, seq: 0, pending: new Map(), handles: [], idle: null, release: null };
+
+async function closeSession() {
+  if (!session.open) return;
+  session.open = false;
+  clearTimeout(session.idle);
+  for (const h of session.handles) h.remove?.();
+  session.handles = [];
+  for (const [, p] of session.pending) p.reject(new Error('browser chiuso'));
+  session.pending.clear();
+  await InAppBrowser.close().catch(() => {});
+  console.log('[browser] sessione immagini chiusa');
+  session.release?.(); session.release = null;
+}
+
+async function ensureSession(pageUrl) {
+  const origin = new URL(pageUrl).origin;
+  if (session.open && session.origin === origin) return;
+  if (session.open) await closeSession();
+  if (session.opening) return session.opening;
+  session.opening = (async () => {
+    // prende il "turno" del browser interno (uno alla volta)
+    let release;
+    const turn = new Promise((r) => { release = r; });
+    const prev = webviewLock;
+    webviewLock = prev.then(() => turn);
+    await prev;
+    session.release = release;
+    await new Promise((resolve, reject) => {
+      let lastLen = -1; let poll = null;
+      const timer = setTimeout(() => { clearInterval(poll); reject(new Error('il sito non si è aperto in tempo')); }, 90000);
+      (async () => {
+        session.handles.push(await InAppBrowser.addListener('messageFromWebview', (ev) => {
+          const d = ev?.detail?.detail || ev?.detail || ev || {};
+          if (d.synReq != null) {
+            const p = session.pending.get(d.synReq);
+            if (p) { session.pending.delete(d.synReq); p.resolve(d); }
+            return;
+          }
+          if (d.synHtml != null && !session.open) {
+            if (!isChallenge(d.synHtml) && d.synReady) {
+              if (lastLen === d.synHtml.length) { clearInterval(poll); clearTimeout(timer); resolve(); }
+              lastLen = d.synHtml.length;
+            } else lastLen = -1;
+          }
+        }));
+        session.handles.push(await InAppBrowser.addListener('closeEvent', () => { closeSession(); reject(new Error('browser chiuso')); }));
+        await InAppBrowser.openWebView({ url: pageUrl, title: 'Scarico le pagine dal sito…', toolbarType: ToolBarType.COMPACT,
+          visibleTitle: true, toolbarColor: '#14151a', toolbarTextColor: '#ffffff' });
+        console.log(`[browser] sessione immagini aperta su ${origin}`);
+        const code = `try{var m={detail:{synHtml:document.title+'|'+document.documentElement.outerHTML.length+(document.documentElement.outerHTML.slice(0,3000)),url:location.href,synReady:document.readyState==='complete'}};`
+          + `(window.mobileApp&&window.mobileApp.postMessage)?window.mobileApp.postMessage(m):window.AndroidInterface.postMessage(JSON.stringify(m))}catch(e){}`;
+        poll = setInterval(() => InAppBrowser.executeScript({ code }).catch(() => {}), 1200);
+      })().catch(reject);
+    });
+    session.open = true; session.origin = origin;
+  })().catch(async (e) => { await closeSession(); session.release?.(); throw e; }).finally(() => { session.opening = null; });
+  return session.opening;
+}
+
+async function browserFetch(url, { pageUrl, probe = false } = {}) {
+  await ensureSession(pageUrl || new URL(url).origin + '/');
+  clearTimeout(session.idle);
+  const id = ++session.seq;
+  const result = new Promise((resolve, reject) => {
+    session.pending.set(id, { resolve, reject });
+    setTimeout(() => { if (session.pending.delete(id)) reject(new Error('tempo scaduto')); }, 60000);
+  });
+  const code = `(async function(){function post(m){m={detail:m};if(window.mobileApp&&window.mobileApp.postMessage){window.mobileApp.postMessage(m)}else{window.AndroidInterface.postMessage(JSON.stringify(m))}}`
+    + `try{var r=await fetch(${JSON.stringify(url)},{credentials:'include'${probe ? ",headers:{Range:'bytes=0-0'}" : ''}});var t=r.headers.get('content-type')||'';var d=null;`
+    + `if(${!probe}&&r.ok){var b=await r.blob();d=await new Promise(function(res){var f=new FileReader();f.onload=function(){res(f.result)};f.readAsDataURL(b)})}`
+    + `post({synReq:${id},status:r.status,type:t,data:d})}catch(e){post({synReq:${id},status:0,error:String(e)})}})()`;
+  await InAppBrowser.executeScript({ code });
+  try { return await result; } finally {
+    if (!session.pending.size) { clearTimeout(session.idle); session.idle = setTimeout(closeSession, 4000); }
+  }
+}
+
+/** Diagnostica: prova a scaricare un'immagine in tutti i modi e scrive i risultati nel registro. */
+export async function diagnoseMedia(url, referer) {
+  console.log(`[test] immagine: ${url}`);
+  for (const [label, headers] of [['nativo, header browser', { ...IMG_HEADERS, ...(referer ? { Referer: referer } : {}) }], ['nativo, minimo', {}]]) {
+    try {
+      const r = native ? await CapacitorHttp.request({ url, method: 'GET', responseType: 'blob', headers, connectTimeout: 20000, readTimeout: 30000 })
+        : await fetch(url).then(async (x) => ({ status: x.status, headers: { 'content-type': x.headers.get('content-type') }, data: '' }));
+      console.log(`[test] ${label}: HTTP ${r.status} ${lower(r.headers)['content-type'] || ''} ${typeof r.data === 'string' ? r.data.length : ''} byte(b64)`);
+    } catch (e) { console.log(`[test] ${label}: errore ${e.message}`); }
+  }
+  await new Promise((resolve) => {
+    const img = new Image(); img.referrerPolicy = 'no-referrer';
+    img.onload = () => { console.log(`[test] <img> senza referrer: OK ${img.naturalWidth}x${img.naturalHeight}`); resolve(); };
+    img.onerror = () => { console.log('[test] <img> senza referrer: errore'); resolve(); };
+    img.src = url; setTimeout(resolve, 15000);
+  });
+  if (native) {
+    try { const r = await browserFetch(url, { probe: true }); console.log(`[test] browser interno: HTTP ${r.status} ${r.type} ${r.error || ''}`); }
+    catch (e) { console.log(`[test] browser interno: errore ${e.message}`); }
+  }
 }

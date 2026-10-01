@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'node:path';
 import { Books, Chapters } from './src/db.js';
-import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds } from './src/engine/engine.js';
+import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds, cancelDownloads } from './src/engine/engine.js';
 import { aiAvailable } from './src/engine/ai.js';
 import { getMedia } from './src/fetcher.js';
 import { startScheduler } from './src/scheduler.js';
@@ -52,6 +52,7 @@ app.post('/api/books/:id/scan', (req, res) => {
 });
 app.post('/api/books/:id/download', (req, res) => {
   const b = bookOr404(req, res); if (!b) return;
+  if (req.body?.cancel) return res.json({ cancelled: cancelDownloads(b.id) });
   const ids = req.body?.chapters;
   if (Array.isArray(ids)) {
     const list = req.body.prefetch ? ids.filter((id) => !Chapters.get(Number(id))?.meta?.offline) : ids;

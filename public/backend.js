@@ -20,3 +20,5 @@ export const settings = null;    // la configurazione del server è nelle variab
 export async function init() {}
 export const logs = null;
 export const version = 'server';
+export const mediaUrlForce = null;
+export const diagnose = null;

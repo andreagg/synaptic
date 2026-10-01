@@ -6,8 +6,8 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const out = path.join(root, 'mobile/www');
-fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
+for (const f of fs.readdirSync(out)) fs.rmSync(path.join(out, f), { recursive: true, force: true });
 
 const swap = {
   [path.join(root, 'public/backend.js')]: path.join(root, 'mobile/backend.js'),

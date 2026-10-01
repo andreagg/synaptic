@@ -232,7 +232,13 @@ async function extractChapter(book, ch) {
 
   // a) tutte le pagine nello stesso HTML
   if (imgs.images.length >= 2 && !imgs.single) {
-    return { type: 'images', content: { images: imgs.images, referer: page.url }, rules: rules.imagePattern ? null : { imagePattern: imgs.pattern } };
+    let images = imgs.images;
+    // poche pagine numerate (es. pagina corrente + anteprima della successiva): completiamo la sequenza
+    if (images.length < 6 && images.every(isNumericName)) {
+      const seq = await probeSequence(book, images[0], page.url);
+      if (seq.length > images.length) images = seq;
+    }
+    return { type: 'images', content: { images, referer: page.url }, rules: rules.imagePattern ? null : { imagePattern: imgs.pattern } };
   }
   // b) PDF / file allegati
   const files = findFiles($, page.url);
@@ -525,6 +531,16 @@ async function runQueue(bookId, q) {
   }
   q.current = null; q.running = false;
   Books.update(bookId, { message: `✓ Download completato: ${q.done} capitoli disponibili offline` });
+}
+
+/** Svuota la coda dei download (il capitolo in corso termina). */
+export function cancelDownloads(bookId) {
+  const q = queues.get(Number(bookId));
+  if (!q) return 0;
+  const n = q.ids.length;
+  q.ids = [];
+  Books.update(Number(bookId), { message: `Download annullati (${n} capitoli tolti dalla coda)` });
+  return n;
 }
 
 /** Scarica in cache tutte le pagine (o il file) di un capitolo già risolto. */

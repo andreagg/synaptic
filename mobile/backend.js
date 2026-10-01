@@ -3,8 +3,8 @@
 import { App } from '@capacitor/app';
 import * as pdfjs from 'pdfjs-dist';
 import { initStore, Books, Chapters } from './store.js';
-import { initMedia, getMedia, mediaObjectUrl, needsBrowser } from './fetcher.js';
-import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds } from '../src/engine/engine.js';
+import { initMedia, getMedia, mediaObjectUrl, needsBrowser, diagnoseMedia } from './fetcher.js';
+import { addSource, scanBook, resolveChapterNow, downloadBook, isBusy, queueDownload, queuedIds, cancelDownloads } from '../src/engine/engine.js';
 import { aiAvailable } from '../src/engine/ai.js';
 import { idbGet, idbSet } from './idb.js';
 
@@ -84,10 +84,12 @@ export async function api(path, opts = {}) {
     if (!action && method === 'DELETE') { Books.remove(b.id); return null; }
     if (action === 'scan') { bg(scanBook(b.id)); return { ok: true }; }
     if (action === 'download') {
+      if (body.cancel) return { cancelled: cancelDownloads(b.id) };
       if (!Array.isArray(body.chapters)) { bg(downloadBook(b.id)); return { ok: true }; }
       let ids = body.chapters.map(Number);
       // precaricamento durante la lettura: solo capitoli che non richiedono il browser interno
       if (body.prefetch) {
+        if (queuedIds(b.id).length) return { queued: 0 }; // non accodare dietro ai download scelti
         ids = ids.filter((id) => {
           const c = Chapters.get(id);
           return c && !c.meta?.offline && (c.status === 'ready' || b.rules?.imageTemplate || !needsBrowser(c.url));
@@ -116,8 +118,18 @@ export async function api(path, opts = {}) {
   fail(404, 'Rotta sconosciuta: ' + path);
 }
 
-// se il download nativo fallisce, lasciamo provare direttamente la WebView
-export const mediaUrl = (u, ref) => mediaObjectUrl(u, ref).catch(() => u);
+// immagini da mostrare: dalla cache o con l'HTTP nativo (l'interfaccia ripiega su <img> diretta)
+export const mediaUrl = (u, ref) => mediaObjectUrl(u, ref);
+// "tocca per riprovare": può usare anche il browser interno
+export async function mediaUrlForce(u, ref) {
+  const { blob } = await getMedia(u, ref, { allowBrowser: true });
+  return URL.createObjectURL(blob);
+}
+export async function diagnose() {
+  const ch = Books.list().flatMap((b) => Chapters.ready(b.id)).find((c) => c.type === 'images' && c.content?.images?.length);
+  if (!ch) { console.log('[test] nessun capitolo con immagini da provare'); return; }
+  await diagnoseMedia(ch.content.images[0], ch.content.referer || ch.url);
+}
 
 /** Android WebView non mostra i PDF: li disegniamo con pdf.js, una pagina sotto l'altra. */
 export async function renderPdf(container, url, ref) {
