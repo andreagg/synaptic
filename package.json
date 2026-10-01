@@ -21,6 +21,7 @@
     "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.9",
+    "@capgo/inappbrowser": "^7.29.4",
     "cheerio": "^1.2.0",
     "express": "^5.2.1",
     "pdfjs-dist": "^4.10.38",

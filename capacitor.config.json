@@ -3,5 +3,6 @@
   "appName": "Synaptic Library",
   "webDir": "mobile/www",
   "server": { "androidScheme": "https", "cleartext": true },
-  "android": { "allowMixedContent": true }
+  "android": { "allowMixedContent": true },
+  "plugins": { "CapacitorCookies": { "enabled": true } }
 }

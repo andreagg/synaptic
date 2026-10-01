@@ -84,7 +84,8 @@ export async function api(path, opts = {}) {
   fail(404, 'Rotta sconosciuta: ' + path);
 }
 
-export const mediaUrl = (u, ref) => mediaObjectUrl(u, ref);
+// se il download nativo fallisce, lasciamo provare direttamente la WebView
+export const mediaUrl = (u, ref) => mediaObjectUrl(u, ref).catch(() => u);
 
 /** Android WebView non mostra i PDF: li disegniamo con pdf.js, una pagina sotto l'altra. */
 export async function renderPdf(container, url, ref) {
