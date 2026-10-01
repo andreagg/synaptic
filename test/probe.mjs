@@ -28,8 +28,12 @@ for (const [name, headers] of [
 }
 
 // 2) Playwright
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  headless: !process.env.DISPLAY,
+  args: ['--disable-blink-features=AutomationControlled'],
+});
 const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 412, height: 915 }, locale: 'it-IT' });
+await ctx.addInitScript(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
 const page = await ctx.newPage();
 const imgResponses = [];
 page.on('response', (r) => { if (r.request().resourceType() === 'image') imgResponses.push(`${r.status()} ${r.url()}`); });
@@ -37,7 +41,7 @@ const visit = async (u, name) => {
   const resp = await page.goto(u, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => ({ status: () => 'ERR ' + e.message }));
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   // attende che la verifica Cloudflare finisca (la pagina si ricarica da sola)
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < 40; i++) {
     const t = await page.title().catch(() => '');
     if (!/Just a moment|Ci siamo quasi|Un momento|Attention/i.test(t)) break;
     await page.waitForTimeout(2000);
