@@ -21,6 +21,24 @@ npm run mock              # sito demo su http://127.0.0.1:4000/manga8/onepiece/v
 npm test                  # test del motore contro il sito demo
 ```
 
+## 📱 App Android
+
+L'app Android contiene **lo stesso motore**, che gira direttamente sul telefono: non serve nessun server.
+Usa l'HTTP nativo di Android (niente blocchi CORS o hotlink), salva libreria e immagini sul telefono
+(lettura offline), mostra i PDF con pdf.js e controlla gli aggiornamenti all'apertura e ogni 15 minuti
+mentre è aperta. Dall'icona ⚙ si inserisce la chiave API di Anthropic per attivare l'AI.
+
+**Scaricarla:** a ogni push la GitHub Action `Android APK` compila l'APK e lo pubblica nelle
+[Release](../../releases/latest) come `SynapticLibrary.apk`. Aprilo dal telefono per installarlo.
+
+**Compilarla in locale** (serve Android Studio/SDK + JDK 21):
+
+```bash
+npm run android:sync      # costruisce mobile/www e prepara il progetto android/
+npx cap add android       # solo la prima volta
+cd android && ./gradlew assembleDebug
+```
+
 ### Variabili d'ambiente
 
 | Variabile | Default | Descrizione |
@@ -71,6 +89,7 @@ src/engine/ai.js        fallback Claude con output strutturato
 src/engine/engine.js    orchestrazione: scansione, risoluzione capitoli, download offline
 src/scheduler.js        controllo periodico aggiornamenti
 public/                 web app mobile-first (libreria, scheda libro, lettore)
+mobile/                 versione Android: archivio IndexedDB, HTTP nativo, backend locale, build esbuild
 test/                   sito demo + test del motore
 ```
 

@@ -75,7 +75,7 @@ export function startMockSite(port = 4000) {
   const state = { extra: [] }; // capitoli aggiunti "in seguito" per testare gli aggiornamenti
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
-    const send = (code, type, body) => { res.writeHead(code, { 'content-type': type }); res.end(body); };
+    const send = (code, type, body) => { res.writeHead(code, { 'content-type': type, 'access-control-allow-origin': '*' }); res.end(body); };
     let m;
     if (u.pathname === '/manga8/onepiece/volumi/lista-capitoli') return send(200, 'text/html; charset=utf-8', index(state.extra));
     if ((m = u.pathname.match(/^\/manga8\/onepiece\/volumi\/volume(\d+)\/capitolo-(\d+)$/))) {

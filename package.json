@@ -8,7 +8,9 @@
     "start": "node --no-warnings server.js",
     "dev": "node --no-warnings --watch server.js",
     "mock": "node test/mock-site.js",
-    "test": "node --no-warnings --test test/*.test.js"
+    "test": "node --no-warnings --test test/*.test.js",
+    "build:mobile": "node mobile/build.mjs",
+    "android:sync": "npm run build:mobile && npx cap sync android"
   },
   "engines": {
     "node": ">=22.5"
@@ -16,9 +18,17 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.130.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.9",
     "cheerio": "^1.2.0",
     "express": "^5.2.1",
+    "pdfjs-dist": "^4.10.38",
     "undici": "^7.30.0",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
+    "esbuild": "^0.28.2"
   }
 }

@@ -1,0 +1,55 @@
+name: Android APK
+
+on:
+  push:
+    branches: [ccr-ccb4605b-xmvyvd, main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+      - name: Test del motore
+        run: npm test
+      - name: Web app per Android
+        run: npm run build:mobile
+      - name: Progetto Android (Capacitor)
+        run: |
+          npx cap add android
+          # consente anche i siti in http://
+          sed -i '0,/<application/s//<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          npx cap sync android
+      - name: Compila APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk SynapticLibrary.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SynapticLibrary-apk
+          path: SynapticLibrary.apk
+      - name: Pubblica la release con l'APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v1.0.${{ github.run_number }}
+          name: Synaptic Library per Android (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: SynapticLibrary.apk
+          body: |
+            Scarica **SynapticLibrary.apk** sul telefono e aprilo per installarlo
+            (Android chiederà di consentire l'installazione da questa fonte).

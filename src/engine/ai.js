@@ -5,14 +5,25 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 
-const MODEL = process.env.AI_MODEL || 'claude-opus-5-5';
+// La configurazione arriva dalle variabili d'ambiente (server) o da globalThis.SYNAPTIC_CONFIG (app mobile).
+const cfg = (k) => globalThis.SYNAPTIC_CONFIG?.[k] || (typeof process !== 'undefined' ? process.env?.[k] : undefined);
+const model = () => cfg('AI_MODEL') || 'claude-opus-5-5';
 
 export function aiAvailable() {
-  return !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  return !!(cfg('ANTHROPIC_API_KEY') || cfg('ANTHROPIC_AUTH_TOKEN'));
 }
 
 let client = null;
-const getClient = () => (client ??= new Anthropic());
+let clientKey = null;
+function getClient() {
+  const key = cfg('ANTHROPIC_API_KEY');
+  if (!client || clientKey !== key) {
+    const inBrowser = typeof window !== 'undefined';
+    client = new Anthropic(key ? { apiKey: key, dangerouslyAllowBrowser: inBrowser } : {});
+    clientKey = key;
+  }
+  return client;
+}
 
 const PageAnalysis = z.object({
   pageType: z.enum(['index', 'reader', 'files', 'article', 'unknown']),
@@ -49,7 +60,7 @@ export async function analyzeWithAI(summary, hint = '') {
   ].filter(Boolean).join('\n');
 
   const response = await getClient().messages.parse({
-    model: MODEL,
+    model: model(),
     max_tokens: 16000,
     output_config: { effort: 'low', format: zodOutputFormat(PageAnalysis) },
     system: SYSTEM,

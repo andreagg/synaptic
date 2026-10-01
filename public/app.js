@@ -1,17 +1,20 @@
 // Frontend a pagina singola, senza framework. Rotte: #/  #/book/:id  #/read/:chapterId
+import * as backend from './backend.js';
+
 const $view = document.getElementById('view');
-const api = async (path, opts = {}) => {
-  const res = await fetch('/api' + path, {
-    headers: { 'content-type': 'application/json' }, ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  if (res.status === 204) return null;
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
-  return data;
-};
+const api = backend.api;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const media = (u, ref) => `/api/media?u=${encodeURIComponent(u)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
+// Le immagini vengono risolte in modo asincrono (proxy del server o cache locale dell'app).
+const mediaAttr = (u, ref) => `data-m="${esc(u)}" data-ref="${esc(ref || '')}"`;
+function hydrate(root = $view) {
+  root.querySelectorAll('[data-m]').forEach(async (el) => {
+    const u = el.dataset.m; el.removeAttribute('data-m');
+    try {
+      const src = await backend.mediaUrl(u, el.dataset.ref || undefined);
+      if (el.tagName === 'IMG') el.src = src; else el.style.backgroundImage = `url('${src}')`;
+    } catch { if (el.tagName === 'IMG') el.alt = '⚠️ immagine non disponibile'; }
+  });
+}
 const toast = (msg) => { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); };
 const KIND = { manga: '📖 Fumetto', series: '📚 Serie', pdf: '📄 PDF', article: '📰 Testo', mixed: '🗂️ Misto', unknown: '…' };
 const ICON = { images: '🖼️', pdf: '📄', file: '📦', html: '📰', page: '•' };
@@ -32,7 +35,7 @@ async function renderLibrary() {
   $view.innerHTML = `<div class="grid">${books.map((b) => `
     <a class="card" href="#/book/${b.id}">
       ${b.new_count ? `<span class="badge">+${b.new_count}</span>` : ''}
-      <div class="cover" style="${b.cover ? `background-image:url('${media(b.cover, b.source_url)}')` : ''}">${b.cover ? '' : '📘'}</div>
+      <div class="cover" ${b.cover ? mediaAttr(b.cover, b.source_url) : ''}>${b.cover ? '' : '📘'}</div>
       <div class="info"><h3>${esc(b.title)}</h3>
         <div class="meta">${statusPill(b)} ${b.chapter_count} elem. · letti ${b.read_count}</div></div>
     </a>`).join('')}</div>`;
@@ -59,7 +62,7 @@ async function renderBook(id) {
   const cont = lastRead || b.chapters[0];
   $view.innerHTML = `
     <section class="hero">
-      <div class="cover" style="${b.cover ? `background-image:url('${media(b.cover, b.source_url)}')` : ''}">${b.cover ? '' : '📘'}</div>
+      <div class="cover" ${b.cover ? mediaAttr(b.cover, b.source_url) : ''}>${b.cover ? '' : '📘'}</div>
       <div>
         <h1>${esc(b.title)}</h1>
         <div class="src"><a href="${esc(b.source_url)}" target="_blank" rel="noopener">${esc(b.source_url)}</a></div>
@@ -93,6 +96,7 @@ async function renderBook(id) {
         ${c.is_new ? '<span class="dot" title="Nuovo"></span>' : ''}
         ${c.read_at ? '<span class="pill ok">letto</span>' : ''}
       </a></li>`).join('')}</ul>`;
+  hydrate();
 
   const q = document.getElementById('q');
   q.oninput = () => { filter = q.value; renderBook(id).then(() => { const n = document.getElementById('q'); n.focus(); n.setSelectionRange(filter.length, filter.length); }); };
@@ -132,16 +136,26 @@ async function renderReader(id) {
   const ref = ch.content?.referer || ch.url;
   if (ch.type === 'images') {
     $view.innerHTML = bar + `<div class="pages">${ch.content.images.map((u, i) =>
-      `<img loading="${i < 3 ? 'eager' : 'lazy'}" src="${media(u, ref)}" alt="Pagina ${i + 1}" onload="this.classList.add('loaded')">`).join('')}</div>` + nav;
+      `<img ${mediaAttr(u, ref)} alt="Pagina ${i + 1}" onload="this.classList.add('loaded')">`).join('')}</div>` + nav;
   } else if (ch.type === 'pdf') {
-    $view.innerHTML = bar + `<iframe class="pdf" src="${media(ch.content.url, ref)}"></iframe>`;
+    if (backend.renderPdf) {
+      $view.innerHTML = bar + '<div class="pages" id="pdfpages"><p class="muted" style="text-align:center">Apro il PDF…</p></div>' + nav;
+      backend.renderPdf(document.getElementById('pdfpages'), ch.content.url, ref).catch((e) => {
+        document.getElementById('pdfpages').innerHTML = `<p class="empty">⚠️ ${esc(e.message)}</p>`;
+      });
+    } else {
+      $view.innerHTML = bar + `<iframe class="pdf" src="${await backend.mediaUrl(ch.content.url, ref)}"></iframe>`;
+    }
   } else if (ch.type === 'html') {
     $view.innerHTML = bar + `<article class="article">${ch.content.html}</article>` + nav;
-    $view.querySelectorAll('.article img').forEach((img) => { img.src = media(new URL(img.getAttribute('src'), ch.url).href, ch.url); });
+    $view.querySelectorAll('.article img').forEach((img) => {
+      try { img.dataset.m = new URL(img.getAttribute('src'), ch.url).href; img.dataset.ref = ch.url; img.removeAttribute('src'); } catch { /* ignore */ }
+    });
   } else {
     $view.innerHTML = bar + `<div class="empty"><div class="big">📦</div><p>File scaricabile</p>
-      <a class="btn primary" href="${media(ch.content.url, ref)}" download>Scarica</a></div>`;
+      <a class="btn primary" href="${await backend.mediaUrl(ch.content.url, ref)}" download>Scarica</a></div>`;
   }
+  hydrate();
   // barra che si nasconde leggendo, avanzamento e salvataggio progresso
   let lastY = 0; let saved = 0;
   const rbar = document.getElementById('rbar'); const prog = document.getElementById('prog');
@@ -179,7 +193,23 @@ async function route() {
   } catch (e) { $view.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p></div>`; }
 }
 addEventListener('hashchange', route);
+await backend.init();
+window.addEventListener('synaptic:changed', () => { if (!location.hash.startsWith('#/read')) route(); });
 route();
+
+// impostazioni (solo app mobile: chiave AI ecc.)
+if (backend.settings) {
+  const btn = document.createElement('button');
+  btn.className = 'btn'; btn.textContent = '⚙'; btn.title = 'Impostazioni';
+  document.getElementById('addBtn').before(btn);
+  btn.onclick = async () => {
+    const cur = await backend.settings.get();
+    const key = prompt("Chiave API Anthropic per l'AI (lascia vuoto per disattivarla):", cur.ANTHROPIC_API_KEY || '');
+    if (key === null) return;
+    await backend.settings.set({ ANTHROPIC_API_KEY: key.trim() });
+    toast(key.trim() ? 'AI attivata' : 'AI disattivata');
+  };
+}
 
 // ---------------------------------------------------------------- aggiunta fonte
 const dlg = document.getElementById('addDialog');
